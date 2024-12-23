@@ -4,13 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/sclgo/impala-go/internal/fi"
-	"github.com/stretchr/testify/require"
 	"net"
 	"net/url"
 	"os"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/sclgo/impala-go/hive"
+	"github.com/sclgo/impala-go/internal/fi"
+	"github.com/stretchr/testify/require"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -22,19 +25,24 @@ func TestIntegration(t *testing.T) {
 	dsn := os.Getenv("IMPALA_DSN")
 	if dsn == "" {
 		ctx := context.Background()
+		t.Log("No IMPALA DSN environment variable set, starting Impala container ...")
 		c := fi.NoError(Setup(ctx)).Require(t)
 		defer fi.NoErrorF(fi.Bind(c.Terminate, ctx), t)
 		dsn = GetDsn(ctx, t, c)
+		t.Log("Started impala at url", dsn)
 	}
 
 	conn := open(t, dsn)
-	defer conn.Close()
+	defer fi.NoErrorF(conn.Close, t)
 
 	t.Run("Pinger", func(t *testing.T) {
 		testPinger(t, conn)
 	})
 	t.Run("Select", func(t *testing.T) {
 		testSelect(t, conn)
+	})
+	t.Run("Metadata", func(t *testing.T) {
+		testMetadata(t, conn)
 	})
 }
 
@@ -73,6 +81,18 @@ func testSelect(t *testing.T, db *sql.DB) {
 	}
 }
 
+func testMetadata(t *testing.T, conn *sql.DB) {
+	_, err := conn.Exec("CREATE TABLE IF NOT EXISTS test(a int)")
+	require.NoError(t, err)
+	m := NewMetadata(conn)
+	res, err := m.GetTables(context.Background(), "default", "test")
+	require.NoError(t, err)
+	require.NotEmpty(t, res)
+	require.True(t, slices.ContainsFunc(res, func(tbl hive.TableName) bool {
+		return tbl.Name == "test" && tbl.Schema == "default" // && tbl.Type == "TABLE"
+	}))
+}
+
 func open(t *testing.T, dsn string) *sql.DB {
 	db, err := sql.Open("impala", dsn)
 	if err != nil {
@@ -104,6 +124,5 @@ func GetDsn(ctx context.Context, t *testing.T, c testcontainers.Container) strin
 		Host:   net.JoinHostPort(host, port),
 		User:   url.User("impala"),
 	}
-	t.Log("url", u.String())
 	return u.String()
 }

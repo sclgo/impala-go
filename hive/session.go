@@ -51,6 +51,13 @@ func (s *Session) ExecuteStatement(ctx context.Context, stmt string) (*Operation
 	return &Operation{h: resp.OperationHandle, hive: s.hive}, nil
 }
 
+func (s *Session) DBMetadata() DBMetadata {
+	return DBMetadata{
+		h:    s.h,
+		hive: s.hive,
+	}
+}
+
 // Close session
 func (s *Session) Close(ctx context.Context) error {
 	s.hive.log.Printf("close session: %v", guid(s.h.GetSessionId().GUID))

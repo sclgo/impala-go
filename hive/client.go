@@ -11,7 +11,7 @@ import (
 
 // Client represents Hive Client
 type Client struct {
-	client *cli_service.TCLIServiceClient
+	client cli_service.TCLIService
 	opts   *Options
 	log    *log.Logger
 }
