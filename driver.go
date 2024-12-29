@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/samber/lo"
 	"github.com/sclgo/impala-go/hive"
 	"github.com/sclgo/impala-go/sasl"
 )
@@ -81,9 +82,9 @@ func parseURI(uri string) (*Options, error) {
 		opts.UseLDAP = true
 	}
 
-	tls, ok := query["tls"]
+	useTls, ok := query["tls"]
 	if ok {
-		v, err := strconv.ParseBool(tls[0])
+		v, err := strconv.ParseBool(useTls[0])
 		if err != nil {
 			return nil, err
 		}
@@ -127,6 +128,13 @@ func parseURI(uri string) (*Options, error) {
 		opts.QueryTimeout = qTimeout
 	}
 
+	logDest, ok := query["log"]
+	if ok {
+		if strings.ToLower(logDest[0]) == "stderr" {
+			opts.LogOut = os.Stderr
+		}
+	}
+
 	return &opts, nil
 }
 
@@ -151,10 +159,13 @@ func NewConnector(opts *Options) driver.Connector {
 	return &connector{opts: opts}
 }
 
-func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
+// Connect implements driver.Connector
+func (c *connector) Connect(context.Context) (driver.Conn, error) {
+	// Strangely, TTransport.Open doesn't support context, so we don't use it here
 	return connect(c.opts)
 }
 
+// Driver implements driver.Connector
 func (c *connector) Driver() driver.Driver {
 	return c.d
 }
@@ -213,7 +224,10 @@ func connect(opts *Options) (*Conn, error) {
 		transport = thrift.NewTBufferedTransport(socket, opts.BufferSize)
 	}
 
-	protocol := thrift.NewTBinaryProtocol(transport, false, true)
+	protocol := thrift.NewTBinaryProtocolConf(transport, &thrift.TConfiguration{
+		TBinaryStrictRead:  lo.ToPtr(false),
+		TBinaryStrictWrite: lo.ToPtr(true),
+	})
 
 	if err := transport.Open(); err != nil {
 		return nil, err

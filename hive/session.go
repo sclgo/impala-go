@@ -23,7 +23,7 @@ func (s *Session) Ping(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := checkStatus(resp); err != nil {
+	if err := s.checkStatus(resp); err != nil {
 		return err
 	}
 
@@ -42,13 +42,26 @@ func (s *Session) ExecuteStatement(ctx context.Context, stmt string) (*Operation
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatus(resp); err != nil {
+	if err := s.checkStatus(resp); err != nil {
 		return nil, err
 	}
-	s.hive.log.Printf("execute operation: %s", guid(resp.OperationHandle.OperationId.GUID))
+	s.hive.log.Printf("execute operation: %s; stmt: %s; status code: %s", guid(resp.OperationHandle.OperationId.GUID), stmt, resp.GetStatus().GetStatusCode())
 	s.hive.log.Printf("operation. has resultset: %v", resp.OperationHandle.GetHasResultSet())
 	s.hive.log.Printf("operation. modified row count: %f", resp.OperationHandle.GetModifiedRowCount())
 	return &Operation{h: resp.OperationHandle, hive: s.hive}, nil
+}
+
+func (s *Session) checkStatus(resp rpcResponse) error {
+	err := checkStatus(resp)
+	if err != nil {
+		return err
+	}
+	if resp.GetStatus().IsSetInfoMessages() {
+		for _, msg := range resp.GetStatus().GetInfoMessages() {
+			s.hive.log.Printf("info message: %s", msg)
+		}
+	}
+	return nil
 }
 
 func (s *Session) DBMetadata() DBMetadata {
@@ -68,7 +81,7 @@ func (s *Session) Close(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := checkStatus(resp); err != nil {
+	if err := s.checkStatus(resp); err != nil {
 		return err
 	}
 	return nil

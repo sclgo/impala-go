@@ -3,6 +3,7 @@ package impala
 import (
 	"context"
 	"database/sql/driver"
+	"fmt"
 	"log"
 	"time"
 
@@ -19,7 +20,10 @@ type Conn struct {
 }
 
 // Ping impala server
+// Implements driver.Pinger
 func (c *Conn) Ping(ctx context.Context) error {
+	// TODO (Github #4) report ErrBadConn when appropriate
+
 	session, err := c.OpenSession(ctx)
 	if err != nil {
 		return err
@@ -45,12 +49,14 @@ func (c *Conn) CheckNamedValue(val *driver.NamedValue) error {
 }
 
 // Prepare returns prepared statement
+// Implements driver.Conn
 func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 	return c.PrepareContext(context.Background(), query)
 }
 
 // PrepareContext returns prepared statement
-func (c *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+// Implements driver.ConnPrepareContext
+func (c *Conn) PrepareContext(_ context.Context, query string) (driver.Stmt, error) {
 	return &Stmt{
 		conn: c,
 		stmt: template(query),
@@ -58,6 +64,7 @@ func (c *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 }
 
 // QueryContext executes a query that may return rows
+// Implements driver.QueryerContext
 func (c *Conn) QueryContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Rows, error) {
 	session, err := c.OpenSession(ctx)
 	if err != nil {
@@ -70,6 +77,7 @@ func (c *Conn) QueryContext(ctx context.Context, q string, args []driver.NamedVa
 }
 
 // ExecContext executes a query that doesn't return rows
+// Implements driver.ExecerContext
 func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Result, error) {
 	session, err := c.OpenSession(ctx)
 	if err != nil {
@@ -82,6 +90,7 @@ func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedVal
 }
 
 // Begin is not supported
+// Implements driver.Conn
 func (c *Conn) Begin() (driver.Tx, error) {
 	return nil, ErrNotSupported
 }
@@ -100,6 +109,7 @@ func (c *Conn) OpenSession(ctx context.Context) (*hive.Session, error) {
 }
 
 // ResetSession closes hive session
+// Implements driver.SessionResetter
 func (c *Conn) ResetSession(ctx context.Context) error {
 	if c.session != nil {
 		if err := c.session.Close(ctx); err != nil {
@@ -111,7 +121,18 @@ func (c *Conn) ResetSession(ctx context.Context) error {
 }
 
 // Close connection
+// Implements driver.Conn
 func (c *Conn) Close() error {
 	c.log.Printf("close connection")
-	return c.t.Close()
+	if c.session != nil {
+		err := c.session.Close(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to close underlying session while closing connection: %w", err)
+		}
+	}
+
+	if err := c.t.Close(); err != nil {
+		return fmt.Errorf("failed to close underlying transport while closing connection: %w", err)
+	}
+	return nil
 }

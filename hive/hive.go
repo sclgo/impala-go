@@ -3,7 +3,6 @@ package hive
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/sclgo/impala-go/services/cli_service"
 )
@@ -13,28 +12,27 @@ const (
 	TimestampFormat = "2006-01-02 15:04:05.999999999"
 )
 
-// RPCResponse respresents thrift rpc response
-type RPCResponse interface {
+// rpcResponse represents thrift rpc response
+type rpcResponse interface {
 	GetStatus() *cli_service.TStatus
 }
 
-func checkStatus(resp interface{}) error {
-	rpcresp, ok := resp.(RPCResponse)
-	if ok {
-		status := rpcresp.GetStatus()
-		if status.StatusCode == cli_service.TStatusCode_ERROR_STATUS {
-			return errors.New(status.GetErrorMessage())
-		}
-		if status.StatusCode == cli_service.TStatusCode_INVALID_HANDLE_STATUS {
-			return errors.New("thrift: invalid handle")
-		}
+func checkStatus(resp rpcResponse) error {
+	status := resp.GetStatus()
+	code := status.StatusCode
 
-		// SUCCESS, SUCCESS_WITH_INFO, STILL_EXECUTING are ok
+	switch code {
+	case cli_service.TStatusCode_SUCCESS_STATUS,
+		cli_service.TStatusCode_SUCCESS_WITH_INFO_STATUS,
+		cli_service.TStatusCode_STILL_EXECUTING_STATUS:
 		return nil
+	case cli_service.TStatusCode_ERROR_STATUS:
+		return errors.New(status.GetErrorMessage())
+	case cli_service.TStatusCode_INVALID_HANDLE_STATUS:
+		return errors.New("thrift: invalid handle")
+	default:
+		return fmt.Errorf("unexpected code: %d; message: %s", code, status.GetErrorMessage())
 	}
-
-	log.Printf("response: %v", resp)
-	return errors.New("thrift: invalid response")
 }
 
 func guid(b []byte) string {

@@ -13,6 +13,6 @@ func (m *plain) Start() (string, []byte, bool, error) {
 	return MechPlain, initial, true, nil
 }
 
-func (m *plain) Step(challenge []byte) ([]byte, bool, error) {
+func (m *plain) Step(_ []byte) ([]byte, bool, error) {
 	return nil, false, ErrUnexpectedServerChallenge
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/apache/thrift/lib/go/thrift"
 )
@@ -129,7 +128,7 @@ func (t *TSaslTransport) Write(buf []byte) (int, error) {
 
 func (t *TSaslTransport) Flush(ctx context.Context) error {
 
-	in, err := ioutil.ReadAll(t.wbuf)
+	in, err := io.ReadAll(t.wbuf)
 	if err != nil {
 		return err
 	}

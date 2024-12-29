@@ -25,7 +25,7 @@ func TestIntegration(t *testing.T) {
 	dsn := os.Getenv("IMPALA_DSN")
 	if dsn == "" {
 		ctx := context.Background()
-		t.Log("No IMPALA DSN environment variable set, starting Impala container ...")
+		t.Log("No IMPALA_DSN environment variable set, starting Impala container ...")
 		c := fi.NoError(Setup(ctx)).Require(t)
 		defer fi.NoErrorF(fi.Bind(c.Terminate, ctx), t)
 		dsn = GetDsn(ctx, t, c)
@@ -43,6 +43,9 @@ func TestIntegration(t *testing.T) {
 	})
 	t.Run("Metadata", func(t *testing.T) {
 		testMetadata(t, conn)
+	})
+	t.Run("Insert", func(t *testing.T) {
+		testInsert(t, conn)
 	})
 }
 
@@ -91,6 +94,25 @@ func testMetadata(t *testing.T, conn *sql.DB) {
 	require.True(t, slices.ContainsFunc(res, func(tbl hive.TableName) bool {
 		return tbl.Name == "test" && tbl.Schema == "default" // && tbl.Type == "TABLE"
 	}))
+}
+
+func testInsert(t *testing.T, conn *sql.DB) {
+	var err error
+	_, err = conn.Exec("DROP TABLE IF EXISTS test")
+	require.NoError(t, err)
+	_, err = conn.Exec("CREATE TABLE if not exists test(a int)")
+	require.NoError(t, err)
+	insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (1)")
+	require.NoError(t, err)
+	_, err = insertRes.RowsAffected()
+	require.Error(t, err) // not supported yet, see todo in statement.go/exec
+	selectRes, err := conn.Query("SELECT * FROM test WHERE a = 1 LIMIT 1")
+	require.NoError(t, err)
+	defer fi.NoErrorF(selectRes.Close, t)
+	require.True(t, selectRes.Next())
+	var val int
+	require.NoError(t, selectRes.Scan(&val))
+	require.Equal(t, val, 1)
 }
 
 func open(t *testing.T, dsn string) *sql.DB {
