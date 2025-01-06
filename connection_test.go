@@ -13,25 +13,37 @@ import (
 
 	"github.com/sclgo/impala-go/hive"
 	"github.com/sclgo/impala-go/internal/fi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"github.com/testcontainers/testcontainers-go"
+	tc "github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestIntegration(t *testing.T) {
+func TestIntegration_FromEnv(t *testing.T) {
 	fi.SkipLongTest(t)
 
 	dsn := os.Getenv("IMPALA_DSN")
 	if dsn == "" {
-		ctx := context.Background()
-		t.Log("No IMPALA_DSN environment variable set, starting Impala container ...")
-		c := fi.NoError(Setup(ctx)).Require(t)
-		defer fi.NoErrorF(fi.Bind(c.Terminate, ctx), t)
-		dsn = GetDsn(ctx, t, c)
-		t.Log("Started impala at url", dsn)
+		t.Skip("No IMPALA_DSN environment variable set. Skipping this test ...")
 	}
 
+	runSuite(t, dsn)
+}
+
+func TestIntegration_Impala3(t *testing.T) {
+	fi.SkipLongTest(t)
+	dsn := startImpala(t)
+	runSuite(t, dsn)
+}
+
+func TestIntegration_Impala4(t *testing.T) {
+	fi.SkipLongTest(t)
+	dsn := startImpala4(t)
+	runSuite(t, dsn)
+}
+
+func runSuite(t *testing.T, dsn string) {
 	conn := open(t, dsn)
 	defer fi.NoErrorF(conn.Close, t)
 
@@ -47,6 +59,42 @@ func TestIntegration(t *testing.T) {
 	t.Run("Insert", func(t *testing.T) {
 		testInsert(t, conn)
 	})
+}
+
+func startImpala(t *testing.T) string {
+	ctx := context.Background()
+	c := fi.NoError(Setup(ctx)).Require(t)
+	dsn := GetDsn(ctx, t, c)
+	t.Cleanup(func() {
+		err := c.Terminate(ctx)
+		assert.NoError(t, err)
+	})
+	return dsn
+}
+
+func startImpala4(t *testing.T) string {
+	var compose tc.ComposeStack
+	compose, err := tc.NewDockerCompose("compose/quickstart.yml")
+	require.NoError(t, err)
+	compose = compose.WithEnv(map[string]string{
+		"IMPALA_QUICKSTART_IMAGE_PREFIX": "apache/impala:4.4.1-",
+		"QUICKSTART_LISTEN_ADDR":         "0.0.0.0",
+	})
+	t.Cleanup(func() {
+		assert.NoError(t, compose.Down(context.Background(), tc.RemoveOrphans(true), tc.RemoveImagesLocal))
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	require.NoError(t, compose.WaitForService("impalad-1", waitRule).Up(ctx, tc.Wait(true)))
+	c, err := compose.ServiceContainer(ctx, "impalad-1")
+	require.NoError(t, err)
+	return GetDsn(ctx, t, c)
+}
+
+type logFunc func(testcontainers.Log)
+
+func (f logFunc) Accept(log testcontainers.Log) {
+	f(log)
 }
 
 func testPinger(t *testing.T, conn *sql.DB) {
@@ -125,12 +173,15 @@ func open(t *testing.T, dsn string) *sql.DB {
 
 const dbPort = "21050/tcp"
 
+var waitRule = wait.ForLog("Impala has started.").WithStartupTimeout(3 * time.Minute)
+
 func Setup(ctx context.Context) (testcontainers.Container, error) {
+
 	req := testcontainers.ContainerRequest{
 		Image:        "apache/kudu:impala-latest",
 		ExposedPorts: []string{dbPort},
 		Cmd:          []string{"impala"},
-		WaitingFor:   wait.ForLog("Impala has started.").WithStartupTimeout(3 * time.Minute),
+		WaitingFor:   waitRule,
 	}
 	return testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
