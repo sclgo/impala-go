@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestStatement(t *testing.T) {
+func TestStatement_ValueReplacement(t *testing.T) {
 	tests := []struct {
 		stmt   string
 		args   []driver.NamedValue

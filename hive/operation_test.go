@@ -38,8 +38,5 @@ type opThriftClient struct {
 
 func (c *opThriftClient) GetOperationStatus(ctx context.Context, _ *cli_service.TGetOperationStatusReq) (*cli_service.TGetOperationStatusResp, error) {
 	c.called = true
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	return &cli_service.TGetOperationStatusResp{}, nil
+	return &cli_service.TGetOperationStatusResp{}, ctx.Err()
 }

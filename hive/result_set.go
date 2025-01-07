@@ -21,11 +21,9 @@ type ResultSet struct {
 
 // Next ...
 func (rs *ResultSet) Next(dest []driver.Value) error {
-	if rs.idx >= rs.length {
-		if !rs.more {
-			return io.EOF
-		}
-
+	for rs.idx >= rs.length && rs.more {
+		// We don't sleep intentionally between loops following the example from impala-shell
+		// https://github.com/apache/impala/blob/1f35747/shell/impala_client.py#L958
 		resp, err := rs.fetchfn()
 		if err != nil {
 			return err
@@ -34,9 +32,13 @@ func (rs *ResultSet) Next(dest []driver.Value) error {
 		rs.more = resp.GetHasMoreRows()
 		rs.idx = 0
 		rs.length = length(rs.result)
+		// It is possible for rs.more to be true, but length(rs.result) to be 0.
+		// This happens when the query is still running but no results were fetched before
+		// FETCH_ROWS_TIMEOUT_MS was reached. We keep calling fetchfn in that case
+		// until query completes, fails, times out (QUERY_TIMEOUT_MS), or context is cancelled.
 	}
 
-	if rs.length == 0 {
+	if rs.idx >= rs.length {
 		return io.EOF
 	}
 

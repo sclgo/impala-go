@@ -42,19 +42,17 @@ func (s *Stmt) CheckNamedValue(val *driver.NamedValue) error {
 
 // Exec executes a query that doesn't return rows
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	nargs := make([]driver.NamedValue, len(args))
-	for i, arg := range args {
-		nargs[i] = driver.NamedValue{Ordinal: i, Value: arg}
-	}
+	// This implementation is never used in recent versions of Go - ExecContext is used instead
+	// even when the user calls sql.Stmt.Exec(). We could implement this required interface method
+	// with panic("not implemented") but we keep a full implementation just in case.
+	nargs := toNamedValues(args)
 	return s.ExecContext(context.Background(), nargs)
 }
 
 // Query executes a query that may return rows
 func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	nargs := make([]driver.NamedValue, len(args))
-	for i, arg := range args {
-		nargs[i] = driver.NamedValue{Ordinal: i, Value: arg}
-	}
+	// Comment in Exec() above applies here as well.
+	nargs := toNamedValues(args)
 	return s.QueryContext(context.Background(), nargs)
 }
 
@@ -76,6 +74,15 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	}
 	stmt := statement(s.stmt, args)
 	return exec(ctx, session, stmt)
+}
+
+func toNamedValues(args []driver.Value) []driver.NamedValue {
+	// note that database/sql ensures Value never wraps a NamedValue so we don't need to check
+	nargs := make([]driver.NamedValue, len(args))
+	for i, arg := range args {
+		nargs[i] = driver.NamedValue{Ordinal: i, Value: arg}
+	}
+	return nargs
 }
 
 func template(query string) string {
@@ -128,8 +135,9 @@ func query(ctx context.Context, session *hive.Session, stmt string) (driver.Rows
 	}
 
 	return &Rows{
-		rs:      rs,
-		schema:  schema,
+		rs:     rs,
+		schema: schema,
+		// TODO align context handling with database/sql practices (Github #14)
 		closefn: func() error { return operation.Close(ctx) },
 	}, nil
 }
@@ -140,6 +148,8 @@ func exec(ctx context.Context, session *hive.Session, stmt string) (driver.Resul
 		return nil, err
 	}
 
+	// wait for DDL/DML to finish like impala-shell :
+	// https://github.com/apache/impala/blob/aac375e/shell/impala_shell.py#L1412
 	err = operation.WaitToFinish(ctx)
 	if err != nil {
 		return nil, err

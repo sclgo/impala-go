@@ -91,12 +91,6 @@ func startImpala4(t *testing.T) string {
 	return GetDsn(ctx, t, c)
 }
 
-type logFunc func(testcontainers.Log)
-
-func (f logFunc) Accept(log testcontainers.Log) {
-	f(log)
-}
-
 func testPinger(t *testing.T, conn *sql.DB) {
 	require.NoError(t, conn.Ping())
 }
@@ -119,15 +113,24 @@ func testSelect(t *testing.T, db *sql.DB) {
 		{sql: "cast('str' as char(10))", res: "str       "},
 		{sql: "cast('str' as varchar(100))", res: "str"},
 		{sql: "cast('2019-01-01 12:00:00' as timestamp)", res: sampletime},
+		// confirms that fetch 0 rows with hasMoreRows = true is correctly handled
+		// relies on FETCH_ROWS_TIMEOUT_MS="1000", configured below
+		{sql: "sleep(5000)", res: true},
 	}
 
 	var res interface{}
 
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	defer fi.NoErrorF(conn.Close, t)
+	_, err = conn.ExecContext(ctx, `SET FETCH_ROWS_TIMEOUT_MS="1000"`)
+	require.NoError(t, err)
 	for _, tt := range tests {
 		t.Run(tt.sql, func(t *testing.T) {
-			err := db.QueryRow(fmt.Sprintf("select %s", tt.sql)).Scan(&res)
+			err = conn.QueryRowContext(ctx, fmt.Sprintf("select %s", tt.sql)).Scan(&res)
 			require.NoError(t, err)
-			require.Equal(t, res, tt.res)
+			require.Equal(t, tt.res, res)
 		})
 	}
 }
