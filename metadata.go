@@ -7,7 +7,8 @@ import (
 	"iter"
 	"slices"
 
-	"github.com/sclgo/impala-go/hive"
+	"github.com/sclgo/impala-go/internal/hive"
+	"github.com/sclgo/impala-go/internal/isql"
 )
 
 // Metadata implements simplified access to hive.DBMetadata given only a high-level sql.DB reference
@@ -38,7 +39,7 @@ func raw[T any](ctx context.Context, db *sql.DB, f func(hive.DBMetadata) (iter.S
 		err = conn.Close()
 	}()
 	err = conn.Raw(func(driverConn any) error {
-		impalaConn, ok := driverConn.(*Conn)
+		impalaConn, ok := driverConn.(*isql.Conn)
 		if !ok {
 			return errors.New("metadata can operate only on Impala drivers")
 		}

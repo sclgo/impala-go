@@ -16,13 +16,14 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/samber/lo"
-	"github.com/sclgo/impala-go/hive"
-	"github.com/sclgo/impala-go/sasl"
+	"github.com/sclgo/impala-go/internal/hive"
+	"github.com/sclgo/impala-go/internal/isql"
+	"github.com/sclgo/impala-go/internal/sasl"
 )
 
 var (
 	// ErrNotSupported means this operation is not supported by impala driver
-	ErrNotSupported = errors.New("impala: not supported")
+	ErrNotSupported = isql.ErrNotSupported
 )
 
 // Driver to impala
@@ -170,7 +171,7 @@ func (c *connector) Driver() driver.Driver {
 	return c.d
 }
 
-func connect(opts *Options) (*Conn, error) {
+func connect(opts *Options) (*isql.Conn, error) {
 
 	addr := net.JoinHostPort(opts.Host, opts.Port)
 
@@ -242,5 +243,5 @@ func connect(opts *Options) (*Conn, error) {
 		QueryTimeout: opts.QueryTimeout,
 	})
 
-	return &Conn{client: client, t: transport, log: logger}, nil
+	return isql.NewConn(client, transport, logger), nil
 }

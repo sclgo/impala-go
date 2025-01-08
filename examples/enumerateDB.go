@@ -28,7 +28,9 @@ func main() {
 
 	connector := impala.NewConnector(&opts)
 	db := sql.OpenDB(connector)
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	ctx := context.Background()
 
