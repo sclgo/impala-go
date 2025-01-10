@@ -36,8 +36,6 @@ func (d *Driver) Open(uri string) (driver.Conn, error) {
 		return nil, err
 	}
 
-	log.Printf("opts: %v", opts)
-
 	conn, err := connect(opts)
 	if err != nil {
 		return nil, err
