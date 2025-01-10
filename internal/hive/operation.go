@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/samber/lo"
-	"github.com/sclgo/impala-go/internal/services/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/cli_service"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/samber/lo"
-	"github.com/sclgo/impala-go/internal/services/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/cli_service"
 	"github.com/stretchr/testify/require"
 )
 

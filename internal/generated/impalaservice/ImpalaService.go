@@ -12,9 +12,9 @@ import (
 	thrift "github.com/apache/thrift/lib/go/thrift"
 	"strings"
 	"regexp"
-	"github.com/sclgo/impala-go/internal/services/status"
-	"github.com/sclgo/impala-go/internal/services/beeswax"
-	"github.com/sclgo/impala-go/internal/services/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/status"
+	"github.com/sclgo/impala-go/internal/generated/beeswax"
+	"github.com/sclgo/impala-go/internal/generated/cli_service"
 
 )
 

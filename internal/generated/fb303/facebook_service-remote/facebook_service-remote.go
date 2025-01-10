@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 	thrift "github.com/apache/thrift/lib/go/thrift"
-	"github.com/sclgo/impala-go/internal/services/fb303"
+	"github.com/sclgo/impala-go/internal/generated/fb303"
 )
 
 var _ = fb303.GoUnusedProtection__

@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/sclgo/impala-go/internal/services/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/cli_service"
 )
 
 // ResultSet ...

@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/sclgo/impala-go/internal/services/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/cli_service"
 )
 
 // Client represents Hive Client

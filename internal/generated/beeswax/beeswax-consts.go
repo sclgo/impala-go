@@ -11,7 +11,7 @@ import (
 	thrift "github.com/apache/thrift/lib/go/thrift"
 	"strings"
 	"regexp"
-	"github.com/sclgo/impala-go/internal/services/hive_metastore"
+	"github.com/sclgo/impala-go/internal/generated/hive_metastore"
 
 )
 

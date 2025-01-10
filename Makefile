@@ -1,8 +1,8 @@
 .PHONY: thrift
 thrift:
-	thrift -r -gen go:package_prefix=github.com/sclgo/impala-go/internal/services/ interfaces/ImpalaService.thrift
-	rm -rf ./internal/services
-	mv gen-go ./internal/services
+	thrift -r -gen go:package_prefix=github.com/sclgo/impala-go/internal/generated/ interfaces/ImpalaService.thrift
+	rm -rf ./internal/generated/
+	mv gen-go ./internal/generated/
 
 .PHONY: cli
 cli: usql

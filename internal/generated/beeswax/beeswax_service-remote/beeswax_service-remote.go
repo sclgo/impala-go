@@ -13,24 +13,17 @@ import (
 	"strconv"
 	"strings"
 	thrift "github.com/apache/thrift/lib/go/thrift"
-	"github.com/sclgo/impala-go/internal/services/status"
-	"github.com/sclgo/impala-go/internal/services/beeswax"
-	"github.com/sclgo/impala-go/internal/services/cli_service"
-	"github.com/sclgo/impala-go/internal/services/impalaservice"
+	"github.com/sclgo/impala-go/internal/generated/hive_metastore"
+	"github.com/sclgo/impala-go/internal/generated/beeswax"
 )
 
-var _ = status.GoUnusedProtection__
+var _ = hive_metastore.GoUnusedProtection__
 var _ = beeswax.GoUnusedProtection__
-var _ = cli_service.GoUnusedProtection__
-var _ = impalaservice.GoUnusedProtection__
 
 func Usage() {
   fmt.Fprintln(os.Stderr, "Usage of ", os.Args[0], " [-h host:port] [-u url] [-f[ramed]] function [arg1 [arg2...]]:")
   flag.PrintDefaults()
   fmt.Fprintln(os.Stderr, "\nFunctions:")
-  fmt.Fprintln(os.Stderr, "  TStatus Cancel(QueryHandle query_id)")
-  fmt.Fprintln(os.Stderr, "  TInsertResult CloseInsert(QueryHandle handle)")
-  fmt.Fprintln(os.Stderr, "  void PingImpalaService()")
   fmt.Fprintln(os.Stderr, "  QueryHandle query(Query query)")
   fmt.Fprintln(os.Stderr, "  QueryHandle executeAndWait(Query query, LogContextId clientCtx)")
   fmt.Fprintln(os.Stderr, "  QueryExplanation explain(Query query)")
@@ -158,89 +151,31 @@ func main() {
   }
   iprot := protocolFactory.GetProtocol(trans)
   oprot := protocolFactory.GetProtocol(trans)
-  client := impalaservice.NewImpalaServiceClient(thrift.NewTStandardClient(iprot, oprot))
+  client := beeswax.NewBeeswaxServiceClient(thrift.NewTStandardClient(iprot, oprot))
   if err := trans.Open(); err != nil {
     fmt.Fprintln(os.Stderr, "Error opening socket to ", host, ":", port, " ", err)
     os.Exit(1)
   }
   
   switch cmd {
-  case "Cancel":
-    if flag.NArg() - 1 != 1 {
-      fmt.Fprintln(os.Stderr, "Cancel requires 1 args")
-      flag.Usage()
-    }
-    arg21 := flag.Arg(1)
-    mbTrans22 := thrift.NewTMemoryBufferLen(len(arg21))
-    defer mbTrans22.Close()
-    _, err23 := mbTrans22.WriteString(arg21)
-    if err23 != nil {
-      Usage()
-      return
-    }
-    factory24 := thrift.NewTJSONProtocolFactory()
-    jsProt25 := factory24.GetProtocol(mbTrans22)
-    argvalue0 := beeswax.NewQueryHandle()
-    err26 := argvalue0.Read(context.Background(), jsProt25)
-    if err26 != nil {
-      Usage()
-      return
-    }
-    value0 := argvalue0
-    fmt.Print(client.Cancel(context.Background(), value0))
-    fmt.Print("\n")
-    break
-  case "CloseInsert":
-    if flag.NArg() - 1 != 1 {
-      fmt.Fprintln(os.Stderr, "CloseInsert requires 1 args")
-      flag.Usage()
-    }
-    arg27 := flag.Arg(1)
-    mbTrans28 := thrift.NewTMemoryBufferLen(len(arg27))
-    defer mbTrans28.Close()
-    _, err29 := mbTrans28.WriteString(arg27)
-    if err29 != nil {
-      Usage()
-      return
-    }
-    factory30 := thrift.NewTJSONProtocolFactory()
-    jsProt31 := factory30.GetProtocol(mbTrans28)
-    argvalue0 := beeswax.NewQueryHandle()
-    err32 := argvalue0.Read(context.Background(), jsProt31)
-    if err32 != nil {
-      Usage()
-      return
-    }
-    value0 := argvalue0
-    fmt.Print(client.CloseInsert(context.Background(), value0))
-    fmt.Print("\n")
-    break
-  case "PingImpalaService":
-    if flag.NArg() - 1 != 0 {
-      fmt.Fprintln(os.Stderr, "PingImpalaService requires 0 args")
-      flag.Usage()
-    }
-    fmt.Print(client.PingImpalaService(context.Background()))
-    fmt.Print("\n")
-    break
   case "query":
     if flag.NArg() - 1 != 1 {
       fmt.Fprintln(os.Stderr, "Query requires 1 args")
       flag.Usage()
     }
-    arg33 := flag.Arg(1)
-    mbTrans34 := thrift.NewTMemoryBufferLen(len(arg33))
-    defer mbTrans34.Close()
-    _, err35 := mbTrans34.WriteString(arg33)
-    if err35 != nil {
+    arg74 := flag.Arg(1)
+    mbTrans75 := thrift.NewTMemoryBufferLen(len(arg74))
+    defer mbTrans75.Close()
+    _, err76 := mbTrans75.WriteString(arg74)
+    if err76 != nil {
       Usage()
       return
     }
-    factory36 := thrift.NewTJSONProtocolFactory()
-    jsProt37 := factory36.GetProtocol(mbTrans34)
+    factory77 := thrift.NewTJSONProtocolFactory()
+    jsProt78 := factory77.GetProtocol(mbTrans75)
     argvalue0 := beeswax.NewQuery()
-    err38 := argvalue0.Read(context.Background(), jsProt37)
-    if err38 != nil {
+    err79 := argvalue0.Read(context.Background(), jsProt78)
+    if err79 != nil {
       Usage()
       return
     }
@@ -253,19 +188,19 @@ func main() {
       fmt.Fprintln(os.Stderr, "ExecuteAndWait requires 2 args")
       flag.Usage()
     }
-    arg39 := flag.Arg(1)
-    mbTrans40 := thrift.NewTMemoryBufferLen(len(arg39))
-    defer mbTrans40.Close()
-    _, err41 := mbTrans40.WriteString(arg39)
-    if err41 != nil {
+    arg80 := flag.Arg(1)
+    mbTrans81 := thrift.NewTMemoryBufferLen(len(arg80))
+    defer mbTrans81.Close()
+    _, err82 := mbTrans81.WriteString(arg80)
+    if err82 != nil {
       Usage()
       return
     }
-    factory42 := thrift.NewTJSONProtocolFactory()
-    jsProt43 := factory42.GetProtocol(mbTrans40)
+    factory83 := thrift.NewTJSONProtocolFactory()
+    jsProt84 := factory83.GetProtocol(mbTrans81)
     argvalue0 := beeswax.NewQuery()
-    err44 := argvalue0.Read(context.Background(), jsProt43)
-    if err44 != nil {
+    err85 := argvalue0.Read(context.Background(), jsProt84)
+    if err85 != nil {
       Usage()
       return
     }
@@ -280,19 +215,19 @@ func main() {
       fmt.Fprintln(os.Stderr, "Explain requires 1 args")
       flag.Usage()
     }
-    arg46 := flag.Arg(1)
-    mbTrans47 := thrift.NewTMemoryBufferLen(len(arg46))
-    defer mbTrans47.Close()
-    _, err48 := mbTrans47.WriteString(arg46)
-    if err48 != nil {
+    arg87 := flag.Arg(1)
+    mbTrans88 := thrift.NewTMemoryBufferLen(len(arg87))
+    defer mbTrans88.Close()
+    _, err89 := mbTrans88.WriteString(arg87)
+    if err89 != nil {
       Usage()
       return
     }
-    factory49 := thrift.NewTJSONProtocolFactory()
-    jsProt50 := factory49.GetProtocol(mbTrans47)
+    factory90 := thrift.NewTJSONProtocolFactory()
+    jsProt91 := factory90.GetProtocol(mbTrans88)
     argvalue0 := beeswax.NewQuery()
-    err51 := argvalue0.Read(context.Background(), jsProt50)
-    if err51 != nil {
+    err92 := argvalue0.Read(context.Background(), jsProt91)
+    if err92 != nil {
       Usage()
       return
     }
@@ -305,27 +240,27 @@ func main() {
       fmt.Fprintln(os.Stderr, "Fetch requires 3 args")
       flag.Usage()
     }
-    arg52 := flag.Arg(1)
-    mbTrans53 := thrift.NewTMemoryBufferLen(len(arg52))
-    defer mbTrans53.Close()
-    _, err54 := mbTrans53.WriteString(arg52)
-    if err54 != nil {
+    arg93 := flag.Arg(1)
+    mbTrans94 := thrift.NewTMemoryBufferLen(len(arg93))
+    defer mbTrans94.Close()
+    _, err95 := mbTrans94.WriteString(arg93)
+    if err95 != nil {
       Usage()
       return
     }
-    factory55 := thrift.NewTJSONProtocolFactory()
-    jsProt56 := factory55.GetProtocol(mbTrans53)
+    factory96 := thrift.NewTJSONProtocolFactory()
+    jsProt97 := factory96.GetProtocol(mbTrans94)
     argvalue0 := beeswax.NewQueryHandle()
-    err57 := argvalue0.Read(context.Background(), jsProt56)
-    if err57 != nil {
+    err98 := argvalue0.Read(context.Background(), jsProt97)
+    if err98 != nil {
       Usage()
       return
     }
     value0 := argvalue0
     argvalue1 := flag.Arg(2) == "true"
     value1 := argvalue1
-    tmp2, err59 := (strconv.Atoi(flag.Arg(3)))
-    if err59 != nil {
+    tmp2, err100 := (strconv.Atoi(flag.Arg(3)))
+    if err100 != nil {
       Usage()
       return
     }
@@ -339,19 +274,19 @@ func main() {
       fmt.Fprintln(os.Stderr, "GetState requires 1 args")
       flag.Usage()
     }
-    arg60 := flag.Arg(1)
-    mbTrans61 := thrift.NewTMemoryBufferLen(len(arg60))
-    defer mbTrans61.Close()
-    _, err62 := mbTrans61.WriteString(arg60)
-    if err62 != nil {
+    arg101 := flag.Arg(1)
+    mbTrans102 := thrift.NewTMemoryBufferLen(len(arg101))
+    defer mbTrans102.Close()
+    _, err103 := mbTrans102.WriteString(arg101)
+    if err103 != nil {
       Usage()
       return
     }
-    factory63 := thrift.NewTJSONProtocolFactory()
-    jsProt64 := factory63.GetProtocol(mbTrans61)
+    factory104 := thrift.NewTJSONProtocolFactory()
+    jsProt105 := factory104.GetProtocol(mbTrans102)
     argvalue0 := beeswax.NewQueryHandle()
-    err65 := argvalue0.Read(context.Background(), jsProt64)
-    if err65 != nil {
+    err106 := argvalue0.Read(context.Background(), jsProt105)
+    if err106 != nil {
       Usage()
       return
     }
@@ -364,19 +299,19 @@ func main() {
       fmt.Fprintln(os.Stderr, "GetResultsMetadata requires 1 args")
       flag.Usage()
     }
-    arg66 := flag.Arg(1)
-    mbTrans67 := thrift.NewTMemoryBufferLen(len(arg66))
-    defer mbTrans67.Close()
-    _, err68 := mbTrans67.WriteString(arg66)
-    if err68 != nil {
+    arg107 := flag.Arg(1)
+    mbTrans108 := thrift.NewTMemoryBufferLen(len(arg107))
+    defer mbTrans108.Close()
+    _, err109 := mbTrans108.WriteString(arg107)
+    if err109 != nil {
       Usage()
       return
     }
-    factory69 := thrift.NewTJSONProtocolFactory()
-    jsProt70 := factory69.GetProtocol(mbTrans67)
+    factory110 := thrift.NewTJSONProtocolFactory()
+    jsProt111 := factory110.GetProtocol(mbTrans108)
     argvalue0 := beeswax.NewQueryHandle()
-    err71 := argvalue0.Read(context.Background(), jsProt70)
-    if err71 != nil {
+    err112 := argvalue0.Read(context.Background(), jsProt111)
+    if err112 != nil {
       Usage()
       return
     }
@@ -427,19 +362,19 @@ func main() {
       fmt.Fprintln(os.Stderr, "Close requires 1 args")
       flag.Usage()
     }
-    arg75 := flag.Arg(1)
-    mbTrans76 := thrift.NewTMemoryBufferLen(len(arg75))
-    defer mbTrans76.Close()
-    _, err77 := mbTrans76.WriteString(arg75)
-    if err77 != nil {
+    arg116 := flag.Arg(1)
+    mbTrans117 := thrift.NewTMemoryBufferLen(len(arg116))
+    defer mbTrans117.Close()
+    _, err118 := mbTrans117.WriteString(arg116)
+    if err118 != nil {
       Usage()
       return
     }
-    factory78 := thrift.NewTJSONProtocolFactory()
-    jsProt79 := factory78.GetProtocol(mbTrans76)
+    factory119 := thrift.NewTJSONProtocolFactory()
+    jsProt120 := factory119.GetProtocol(mbTrans117)
     argvalue0 := beeswax.NewQueryHandle()
-    err80 := argvalue0.Read(context.Background(), jsProt79)
-    if err80 != nil {
+    err121 := argvalue0.Read(context.Background(), jsProt120)
+    if err121 != nil {
       Usage()
       return
     }
