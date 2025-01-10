@@ -15,5 +15,11 @@ test-cli: usql
 	./usql -c "\drivers" | grep impala
 
 test:
-	go test -race -covermode atomic -coverprofile=covprofile -v -vet=all `exec go list ./... | grep -v "./internal/generated"`
-	go tool cover -html=covprofile -o coverage.html
+	mkdir -p coverage/covdata
+	# Use the new binary format to ensure integration tests and cross-package calls are counted towards coverage
+	# https://go.dev/blog/integration-test-coverage
+	go test -race -cover -v -vet=all `exec go list ./... | grep -v "./internal/generated"` -args -test.gocoverdir="${PWD}/coverage/covdata"
+	go tool covdata percent -i=./coverage/covdata
+	# Convert to old text format for coveralls upload
+	go tool covdata textfmt -i=./coverage/covdata -o ./coverage/covprofile
+	go tool cover -html=./coverage/covprofile -o ./coverage/coverage.html
