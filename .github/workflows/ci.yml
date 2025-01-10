@@ -24,12 +24,18 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -covermode atomic -coverprofile=covprofile -v -vet=all ./...
+      run: make test
 
     - name: Send coverage
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
-      run: go run github.com/mattn/goveralls@latest -coverprofile=covprofile -service=github    
+      run: go run github.com/mattn/goveralls@latest -coverprofile=covprofile -service=github
+
+    - name: Archive code coverage results
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-coverage-report
+        path: coverage.html
 
   post-merge:
     runs-on: ubuntu-latest

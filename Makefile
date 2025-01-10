@@ -14,3 +14,6 @@ usql:
 test-cli: usql
 	./usql -c "\drivers" | grep impala
 
+test:
+	go test -race -covermode atomic -coverprofile=covprofile -v -vet=all `exec go list ./... | grep -v "./internal/generated"`
+	go tool cover -html=covprofile -o coverage.html
