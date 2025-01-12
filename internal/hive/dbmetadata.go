@@ -66,22 +66,46 @@ func (m DBMetadata) GetTablesSeq(ctx context.Context, schemaPattern string, tabl
 	}
 
 	return func(yield func(TableName) bool) {
-		err = readTables(ctx, op, rs, yield)
+		err = read(ctx, op, rs, 4, readTable, yield)
 	}, &err
 }
 
-func readTables(ctx context.Context, op *Operation, rs *ResultSet, yield func(TableName) bool) error {
-	row := make([]driver.Value, 4)
+func (m DBMetadata) GetSchemasSeq(ctx context.Context, pattern string) (iter.Seq[string], *error) {
+	req := cli_service.TGetSchemasReq{
+		SessionHandle: m.h,
+		SchemaName:    lo.ToPtr(cli_service.TPatternOrIdentifier(pattern)),
+	}
+
+	resp, err := m.hive.client.GetSchemas(ctx, &req)
+	if err != nil {
+		return nil, &err
+	}
+	if err = checkStatus(resp); err != nil {
+		return nil, &err
+	}
+	op := &Operation{
+		h:    resp.OperationHandle,
+		hive: m.hive,
+	}
+
+	rs, err := op.FetchResults(ctx, tableResultSchema)
+	if err != nil {
+		return nil, &err
+	}
+
+	return func(yield func(string) bool) {
+		err = read(ctx, op, rs, 1, readSchema, yield)
+	}, &err
+}
+
+func read[T any](ctx context.Context, op *Operation, rs *ResultSet, rowLength int, readf func([]driver.Value) T, yield func(T) bool) error {
+	row := make([]driver.Value, rowLength)
 	for i := range row {
 		row[i] = ""
 	}
 	var err error
 	for err = rs.Next(row); err == nil && ctx.Err() == nil; err = rs.Next(row) {
-		tbl := TableName{
-			Schema: fmt.Sprintf("%v", row[1]),
-			Name:   fmt.Sprintf("%v", row[2]),
-			Type:   fmt.Sprintf("%v", row[3]),
-		}
+		tbl := readf(row)
 		if !yield(tbl) {
 			break
 		}
@@ -96,7 +120,19 @@ func readTables(ctx context.Context, op *Operation, rs *ResultSet, yield func(Ta
 	return err
 }
 
-// withFallbackCtx ensure cleanup runs even if we are existing because the context is cancelled
+func readTable(row []driver.Value) TableName {
+	return TableName{
+		Schema: fmt.Sprintf("%v", row[1]),
+		Name:   fmt.Sprintf("%v", row[2]),
+		Type:   fmt.Sprintf("%v", row[3]),
+	}
+}
+
+func readSchema(row []driver.Value) string {
+	return fmt.Sprintf("%v", row[0])
+}
+
+// withFallbackCtx ensure cleanup runs even if we are cleaning up because the context is cancelled
 func withFallbackCtx(ctx context.Context, cleanup func(ctx context.Context) error) error {
 	if ctx.Err() != nil {
 		var cancel context.CancelFunc

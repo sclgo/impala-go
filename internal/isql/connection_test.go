@@ -13,7 +13,6 @@ import (
 
 	"github.com/sclgo/impala-go"
 	"github.com/sclgo/impala-go/internal/fi"
-	"github.com/sclgo/impala-go/internal/hive"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -137,15 +136,23 @@ func testSelect(t *testing.T, db *sql.DB) {
 }
 
 func testMetadata(t *testing.T, conn *sql.DB) {
-	_, err := conn.Exec("CREATE TABLE IF NOT EXISTS test(a int)")
-	require.NoError(t, err)
+	_, cerr := conn.Exec("CREATE TABLE IF NOT EXISTS test(a int)")
+	require.NoError(t, cerr)
 	m := impala.NewMetadata(conn)
-	res, err := m.GetTables(context.Background(), "default", "test")
-	require.NoError(t, err)
-	require.NotEmpty(t, res)
-	require.True(t, slices.ContainsFunc(res, func(tbl hive.TableName) bool {
-		return tbl.Name == "test" && tbl.Schema == "default" // && tbl.Type == "TABLE"
-	}))
+	t.Run("Tables", func(t *testing.T) {
+		res, err := m.GetTables(context.Background(), "defaul%", "tes%")
+		require.NoError(t, err)
+		require.NotEmpty(t, res)
+		require.True(t, slices.ContainsFunc(res, func(tbl impala.TableName) bool {
+			return tbl.Name == "test" && tbl.Schema == "default" && tbl.Type == "TABLE"
+		}))
+	})
+	t.Run("Schemas", func(t *testing.T) {
+		res, err := m.GetSchemas(context.Background(), "defaul%")
+		require.NoError(t, err)
+		require.Contains(t, res, "default")
+	})
+
 }
 
 func testInsert(t *testing.T, conn *sql.DB) {
