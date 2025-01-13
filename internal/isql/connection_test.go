@@ -3,6 +3,7 @@ package isql_test
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"net"
 	"net/url"
@@ -11,8 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/sclgo/impala-go"
 	"github.com/sclgo/impala-go/internal/fi"
+	"github.com/sclgo/impala-go/internal/sclerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -43,21 +46,76 @@ func TestIntegration_Impala4(t *testing.T) {
 	runSuite(t, dsn)
 }
 
+func TestIntegration_Restart(t *testing.T) {
+	fi.SkipLongTest(t)
+	ctx := context.Background()
+	req := testcontainers.ContainerRequest{
+		Image:        "apache/kudu:impala-latest",
+		ExposedPorts: []string{"21050:21050"}, // TODO random port that is stable across restart
+		Cmd:          []string{"impala"},
+		WaitingFor:   waitRule,
+	}
+	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+
+	require.NoError(t, err)
+	dsn := GetDsn(ctx, t, c)
+	t.Cleanup(func() {
+		err := c.Terminate(ctx)
+		assert.NoError(t, err)
+	})
+
+	db := fi.NoError(sql.Open("impala", dsn)).Require(t)
+	defer sclerr.CloseQuietly(db)
+
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+
+	defer sclerr.CloseQuietly(conn)
+
+	err = conn.PingContext(ctx)
+	require.NoError(t, err)
+
+	// ensure there is an open connection in the pool
+	err = db.PingContext(ctx)
+	require.NoError(t, err)
+
+	err = c.Stop(ctx, lo.ToPtr(1*time.Minute))
+	require.NoError(t, err)
+	err = c.Start(ctx)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		perr := db.PingContext(ctx)
+		if perr != nil {
+			require.ErrorIs(t, perr, driver.ErrBadConn)
+		}
+		t.Log(perr)
+		return perr == nil
+	}, 2*time.Minute, 2*time.Second)
+
+	err = conn.PingContext(ctx)
+	require.Error(t, err)
+	// require.ErrorIs(t, err, driver.ErrBadConn) hmmm?
+}
+
 func runSuite(t *testing.T, dsn string) {
-	conn := open(t, dsn)
-	defer fi.NoErrorF(conn.Close, t)
+	db := fi.NoError(sql.Open("impala", dsn)).Require(t)
+	defer fi.NoErrorF(db.Close, t)
 
 	t.Run("Pinger", func(t *testing.T) {
-		testPinger(t, conn)
+		testPinger(t, db)
 	})
 	t.Run("Select", func(t *testing.T) {
-		testSelect(t, conn)
+		testSelect(t, db)
 	})
 	t.Run("Metadata", func(t *testing.T) {
-		testMetadata(t, conn)
+		testMetadata(t, db)
 	})
 	t.Run("Insert", func(t *testing.T) {
-		testInsert(t, conn)
+		testInsert(t, db)
 	})
 }
 
@@ -172,14 +230,6 @@ func testInsert(t *testing.T, conn *sql.DB) {
 	var val int
 	require.NoError(t, selectRes.Scan(&val))
 	require.Equal(t, val, 1)
-}
-
-func open(t *testing.T, dsn string) *sql.DB {
-	db, err := sql.Open("impala", dsn)
-	if err != nil {
-		t.Fatalf("Could not connect to %s: %s", dsn, err)
-	}
-	return db
 }
 
 const dbPort = "21050/tcp"

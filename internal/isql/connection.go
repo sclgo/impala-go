@@ -10,6 +10,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/sclgo/impala-go/internal/hive"
+	"github.com/sclgo/impala-go/internal/sclerr"
 )
 
 var (
@@ -28,18 +29,23 @@ type Conn struct {
 // Ping impala server
 // Implements driver.Pinger
 func (c *Conn) Ping(ctx context.Context) error {
-	// TODO (Github #4) report ErrBadConn when appropriate
-
 	session, err := c.OpenSession(ctx)
+	// returns err with ErrBadConn in chain if session is not already open and open fails
 	if err != nil {
 		return err
 	}
 
-	if err := session.Ping(ctx); err != nil {
-		return err
-	}
+	err = session.Ping(ctx)
 
-	return nil
+	// Looking at go stdlib code, it seems that both "broken pipe" and "reset" are not
+	// specific error instances, so they can be checked only by message.
+	// Possibly, the reason is that those messages come from the OS.
+	if sclerr.ContainsAny(err, "broken pipe", "connection reset by peer") {
+		err = fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
+	}
+	// There can be other similar cases, but driver.ErrBadConn and Ping specs require us
+	// to only return it in chain if we are certain.
+	return err
 }
 
 // CheckNamedValue is called before passing arguments to the driver
@@ -107,7 +113,7 @@ func (c *Conn) OpenSession(ctx context.Context) (*hive.Session, error) {
 		session, err := c.client.OpenSession(ctx)
 		if err != nil {
 			c.log.Printf("failed to open session: %v", err)
-			return nil, driver.ErrBadConn
+			return nil, fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
 		}
 		c.session = session
 	}
