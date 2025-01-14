@@ -88,7 +88,8 @@ func (op *Operation) FetchResults(ctx context.Context, schema *TableSchema) (*Re
 	return &rs, nil
 }
 
-func (op *Operation) GetState(ctx context.Context) (cli_service.TOperationState, error) {
+// CheckStateAndStatus returns the operation state if both the state and status are ok
+func (op *Operation) CheckStateAndStatus(ctx context.Context) (cli_service.TOperationState, error) {
 	req := cli_service.TGetOperationStatusReq{
 		OperationHandle: op.h,
 	}
@@ -99,17 +100,22 @@ func (op *Operation) GetState(ctx context.Context) (cli_service.TOperationState,
 	if err = checkStatus(resp); err != nil {
 		return 0, err
 	}
-	return resp.GetOperationState(), nil
+	if err = checkState(resp); err != nil {
+		return 0, err
+	}
+	state := resp.GetOperationState()
+	op.hive.log.Println("op", guid(op.h.GetOperationId().GetGUID()), "reached success or non-terminal state", state)
+	return state, nil
 }
 
 // WaitToFinish waits for the operation to reach a FINISHED state
 // Returns error if the operation fails or the context is cancelled.
 func (op *Operation) WaitToFinish(ctx context.Context) error {
 	duration := initialBackoff
-	opState, err := op.GetState(ctx)
+	opState, err := op.CheckStateAndStatus(ctx)
 	for err == nil && opState != cli_service.TOperationState_FINISHED_STATE {
 		sleep(ctx, duration)
-		opState, err = op.GetState(ctx)
+		opState, err = op.CheckStateAndStatus(ctx)
 		// GetState should have returned an error if ctx.Err() but just in case
 		err = lo.CoalesceOrEmpty(err, ctx.Err())
 		duration = nextDuration(duration)

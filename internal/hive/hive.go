@@ -27,12 +27,25 @@ func checkStatus(resp rpcResponse) error {
 		cli_service.TStatusCode_STILL_EXECUTING_STATUS:
 		return nil
 	case cli_service.TStatusCode_ERROR_STATUS:
-		return errors.New(status.GetErrorMessage())
+		return fmt.Errorf("%v: %s", code, status.GetErrorMessage())
 	case cli_service.TStatusCode_INVALID_HANDLE_STATUS:
 		return errors.New("thrift: invalid handle")
 	default:
 		return fmt.Errorf("unexpected code: %d; message: %s", code, status.GetErrorMessage())
 	}
+}
+
+func checkState(resp *cli_service.TGetOperationStatusResp) error {
+	state := resp.GetOperationState()
+	switch state {
+	case cli_service.TOperationState_CANCELED_STATE:
+		return errors.New("operation cancelled on the server")
+	case cli_service.TOperationState_ERROR_STATE:
+		// in rare cases status may be SUCCESS even if state is ERROR
+		// for example, if the error is discovered by Hive Metastore but not by Impala
+		return fmt.Errorf("%v: %s", state, resp.GetErrorMessage())
+	}
+	return nil // all other states are considered either success or non-terminal
 }
 
 func guid(b []byte) string {
