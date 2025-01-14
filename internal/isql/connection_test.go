@@ -263,11 +263,11 @@ func testInsert(t *testing.T, conn *sql.DB) {
 	require.NoError(t, err)
 	_, err = conn.Exec("CREATE TABLE test(a int)")
 	require.NoError(t, err)
-	insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (1)")
+	insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (?)", 1)
 	require.NoError(t, err)
 	_, err = insertRes.RowsAffected()
 	require.Error(t, err) // not supported yet, see todo in statement.go/exec
-	selectRes, err := conn.Query("SELECT * FROM test WHERE a = 1 LIMIT 1")
+	selectRes, err := conn.Query("SELECT * FROM test WHERE a = ? LIMIT 1", 1)
 	require.NoError(t, err)
 	defer fi.NoErrorF(selectRes.Close, t)
 	require.True(t, selectRes.Next())

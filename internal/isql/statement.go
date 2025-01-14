@@ -25,6 +25,10 @@ func (s *Stmt) Close() error {
 
 // NumInput returns number of inputs
 func (s *Stmt) NumInput() int {
+	// -1 means the driver doesn't know how to count the number of
+	// placeholders, so (database/sql) won't sanity check input
+	// See https://cs.opensource.google/go/go/+/refs/tags/go1.23.4:src/database/sql/convert.go;l=109
+	// We could implement counting placeholders in the future.
 	return -1
 }
 
@@ -43,17 +47,15 @@ func (s *Stmt) CheckNamedValue(val *driver.NamedValue) error {
 // Exec executes a query that doesn't return rows
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	// This implementation is never used in recent versions of Go - ExecContext is used instead
-	// even when the user calls sql.Stmt.Exec(). We could implement this required interface method
-	// with panic("not implemented") but we keep a full implementation just in case.
-	nargs := toNamedValues(args)
-	return s.ExecContext(context.Background(), nargs)
+	// even when the user calls sql.Stmt.Exec(). Following the example in database/sql/fakedb_test.go
+	// we can implement this as:
+	panic("ExecContext was not called.")
 }
 
 // Query executes a query that may return rows
 func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	// Comment in Exec() above applies here as well.
-	nargs := toNamedValues(args)
-	return s.QueryContext(context.Background(), nargs)
+	panic("QueryContext was not called.")
 }
 
 // QueryContext executes a query that may return rows
@@ -74,15 +76,6 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	}
 	stmt := statement(s.stmt, args)
 	return exec(ctx, session, stmt)
-}
-
-func toNamedValues(args []driver.Value) []driver.NamedValue {
-	// note that database/sql ensures Value never wraps a NamedValue so we don't need to check
-	nargs := make([]driver.NamedValue, len(args))
-	for i, arg := range args {
-		nargs[i] = driver.NamedValue{Ordinal: i, Value: arg}
-	}
-	return nargs
 }
 
 func template(query string) string {
