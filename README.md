@@ -1,5 +1,7 @@
 # Golang Apache Impala Driver 
 
+<img src="./docs/logo.svg" width="64" alt="project logo - gopher with impala horns" align="right">
+
 **The actively supported Apache Impala driver for Go's [database/sql](https://golang.org/pkg/database/sql) package**
 
 This driver started as a fork of [github.com/bippio/go-impala](https://github.com/bippio/go-impala),
@@ -29,7 +31,7 @@ The connection string uses a URL format: impala://username:password@host:port?pa
 
 * `auth` - string. Authentication mode. Supported values: "noauth", "ldap"
 * `tls` - boolean. Enable TLS
-* `ca-cert` - The file that contains the public key certificate of the CA that signed the impala certificate
+* `ca-cert` - The file that contains the public key certificate of the CA that signed the Impala certificate
 * `batch-size` - integer value (default: 1024). Maximum number of rows fetched per request
 * `buffer-size`- in bytes (default: 4096); Buffer size for the Thrift transport 
 * `mem-limit` - string value (example: 3m); Memory limit for query 	
@@ -106,24 +108,25 @@ import (
 )
 
 func main() {
-
 	opts := impala.DefaultOptions
 
-	opts.Host = "<impala host>"
+	opts.Host = "localhost" // impala host
 	opts.Port = "21050"
 
 	// enable LDAP authentication:
-	opts.UseLDAP = true
-	opts.Username = "<ldap username>"
-	opts.Password = "<ldap password>"
-
+	//opts.UseLDAP = true
+	//opts.Username = "<ldap username>"
+	//opts.Password = "<ldap password>"
+	//
 	// enable TLS
-	opts.UseTLS = true
-	opts.CACertPath = "/path/to/cacert"
+	//opts.UseTLS = true
+	//opts.CACertPath = "/path/to/cacert"
 
 	connector := impala.NewConnector(&opts)
 	db := sql.OpenDB(connector)
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	ctx := context.Background()
 
@@ -132,49 +135,41 @@ func main() {
 		log.Fatal(err)
 	}
 
-	r := struct {
-		name    string
-		comment string
-	}{}
-
+	var name, comment string
 	databases := make([]string, 0) // databases will contain all the DBs to enumerate later
 	for rows.Next() {
-		if err := rows.Scan(&r.name, &r.comment); err != nil {
+		if err := rows.Scan(&name, &comment); err != nil {
 			log.Fatal(err)
 		}
-		databases = append(databases, r.name)
+		databases = append(databases, name)
 	}
 	if err := rows.Err(); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("List of Databases", databases)
 
-	stmt, err := db.PrepareContext(ctx, "SHOW TABLES IN ?")
+	tables, err := impala.NewMetadata(db).GetTables(ctx, "%", "%")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	tbl := struct {
-		name string
-	}{}
-
-	for _, d := range databases {
-		rows, err := stmt.QueryContext(ctx, d)
-		if err != nil {
-			log.Printf("error in querying database %s: %s", d, err.Error())
-			continue
-		}
-
-		tables := make([]string, 0)
-		for rows.Next() {
-			if err := rows.Scan(&tbl.name); err != nil {
-				log.Println(err)
-				continue
-			}
-			tables = append(tables, tbl.name)
-		}
-		log.Printf("List of Tables in Database %s: %v\n", d, tables)
-	}
+	log.Println("List of Tables", tables)
 }
-
 ```
+
+## Support
+
+The library is actively tested with Impala 4.1 and 3.4.
+All 3.x and 4.x minor versions should work well. 2.x is also supported
+on a best-effort basis.
+
+File any issues that you encounter as Github issues.
+
+## Copyright and acknowledgements
+
+This library started as a fork of [github.com/bippio/go-impala](https://github.com/bippio/go-impala),
+under [the MIT license](https://github.com/bippio/go-impala/blob/ebab2bf/LICENSE). This library retains the same
+license.
+
+The [project logo](/docs/logo.svg) combines the Golang Gopher from
+[github.com/golang-samples/gopher-vector](https://github.com/golang-samples/gopher-vector)
+with the [Apache Impala logo](https://impala.apache.org/img/impala-logo.png), licensed under the Apache 2 license.
