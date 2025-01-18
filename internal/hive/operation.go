@@ -116,7 +116,7 @@ func (op *Operation) WaitToFinish(ctx context.Context) error {
 	for err == nil && opState != cli_service.TOperationState_FINISHED_STATE {
 		sleep(ctx, duration)
 		opState, err = op.CheckStateAndStatus(ctx)
-		// GetState should have returned an error if ctx.Err() but just in case
+		// It is important to check ctx.Err() as Thrift almost always ignores context - at least up to v0.21.
 		err = lo.CoalesceOrEmpty(err, ctx.Err())
 		duration = nextDuration(duration)
 	}
@@ -134,6 +134,7 @@ func fetch(ctx context.Context, op *Operation) (*cli_service.TFetchResultsResp, 
 	var duration time.Duration
 	fetchStatus := cli_service.TStatusCode_STILL_EXECUTING_STATUS
 	resp := &cli_service.TFetchResultsResp{}
+	// It is important to check ctx.Err() as Thrift almost always ignores context - at least up to v0.21.
 	for fetchStatus == cli_service.TStatusCode_STILL_EXECUTING_STATUS && ctx.Err() == nil {
 		// It is questionable if we need to back-off (sleep) in this case
 		// impala-shell doesn't - https://github.com/apache/impala/blob/1f35747/shell/impala_client.py#L958

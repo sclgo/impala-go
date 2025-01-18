@@ -129,6 +129,9 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 	t.Run("Insert", func(t *testing.T) {
 		testInsert(t, db)
 	})
+	t.Run("Connection State", func(t *testing.T) {
+		testConnState(t, db)
+	})
 }
 
 func runErrorCases(t *testing.T, db *sql.DB) {
@@ -143,6 +146,47 @@ func runErrorCases(t *testing.T, db *sql.DB) {
 		_, err = db.Exec("CREATE TABLE test(a int) LOCATION '/some/location'")
 		require.ErrorContains(t, err, "ImpalaRuntimeException")
 	})
+
+	t.Run("Context Cancelled", func(t *testing.T) {
+
+		startTime := time.Now()
+		bkgCtx := context.Background()
+		conn, err := db.Conn(bkgCtx)
+		require.NoError(t, err)
+		defer fi.NoErrorF(conn.Close, t)
+		_, err = conn.ExecContext(bkgCtx, `SET FETCH_ROWS_TIMEOUT_MS="500"`)
+		require.NoError(t, err)
+		ctx, cancel := context.WithTimeout(bkgCtx, 1*time.Second)
+		defer cancel()
+		row := conn.QueryRowContext(ctx, "SELECT SLEEP(10000)")
+		var val any
+		err = row.Scan(&val)
+		require.NoError(t, row.Err())
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Less(t, time.Since(startTime), 5*time.Second)
+
+	})
+}
+
+// testConnState verifies that the connection created db.Conn matches 1:1
+// to an Impala connection so connection-scoped state persists across calls
+func testConnState(t *testing.T, db *sql.DB) {
+	var err error
+	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS foo")
+	require.NoError(t, err)
+	_, err = db.Exec("DROP TABLE IF EXISTS foo.bar")
+	require.NoError(t, err)
+	_, err = db.Exec("CREATE TABLE foo.bar(a int)")
+	require.NoError(t, err)
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	defer fi.NoErrorF(conn.Close, t)
+	_, err = conn.ExecContext(ctx, "USE foo")
+	require.NoError(t, err)
+	res, err := conn.QueryContext(ctx, "SELECT * FROM bar")
+	require.NoError(t, err)
+	require.NoError(t, res.Close())
 }
 
 func runImpala4SpecificTests(t *testing.T, dsn string) {

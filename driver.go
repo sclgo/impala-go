@@ -195,6 +195,7 @@ func connect(opts *Options) (*isql.Conn, error) {
 			TLSConfig: tlsConf,
 		})
 	} else {
+		// TODO SocketTimeout, ConnectTimeout Github #34
 		socket = thrift.NewTSocketConf(addr, &thrift.TConfiguration{})
 	}
 
