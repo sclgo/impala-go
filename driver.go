@@ -160,7 +160,7 @@ func NewConnector(opts *Options) driver.Connector {
 
 // Connect implements driver.Connector
 func (c *connector) Connect(context.Context) (driver.Conn, error) {
-	// Strangely, TTransport.Open doesn't support context, so we don't use it here
+	// TTransport.Open doesn't support context. In general, Thrift almost always doesn't accept or ignores context.
 	return connect(c.opts)
 }
 
@@ -174,28 +174,25 @@ func connect(opts *Options) (*isql.Conn, error) {
 	addr := net.JoinHostPort(opts.Host, opts.Port)
 
 	var socket thrift.TTransport
+	var tlsConf *tls.Config
 	if opts.UseTLS {
 
-		if opts.CACertPath == "" {
-			return nil, errors.New("Please provide CA certificate path")
+		certPath := opts.CACertPath
+		if certPath == "" {
+			return nil, errors.New("impala: please provide CA certificate path")
 		}
 
-		caCert, certErr := os.ReadFile(opts.CACertPath)
-		if certErr != nil {
-			return nil, certErr
+		caCertPool, err := readCert(certPath)
+		if err != nil {
+			return nil, fmt.Errorf("impala: failed to read CA certificate: %w", err)
 		}
 
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-
-		tlsConf := &tls.Config{
+		tlsConf = &tls.Config{
 			RootCAs: caCertPool,
 		}
-		socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
-			TLSConfig: tlsConf,
-		})
+		// Configuration applied in protocol below
+		socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{})
 	} else {
-		// TODO SocketTimeout, ConnectTimeout Github #34
 		socket = thrift.NewTSocketConf(addr, &thrift.TConfiguration{})
 	}
 
@@ -225,12 +222,15 @@ func connect(opts *Options) (*isql.Conn, error) {
 	}
 
 	protocol := thrift.NewTBinaryProtocolConf(transport, &thrift.TConfiguration{
+		// The following configuration is propagated to Transport / Socket
 		TBinaryStrictRead:  lo.ToPtr(false),
 		TBinaryStrictWrite: lo.ToPtr(true),
+		TLSConfig:          tlsConf,
+		// TODO SocketTimeout, ConnectTimeout Github #34
 	})
 
 	if err := transport.Open(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("impala: failed to open connection: %w", err)
 	}
 
 	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
@@ -243,4 +243,18 @@ func connect(opts *Options) (*isql.Conn, error) {
 	})
 
 	return isql.NewConn(client, transport, logger), nil
+}
+
+func readCert(certPath string) (*x509.CertPool, error) {
+	caCert, certErr := os.ReadFile(certPath)
+	if certErr != nil {
+		return nil, certErr
+	}
+
+	caCertPool := x509.NewCertPool()
+	ok := caCertPool.AppendCertsFromPEM(caCert)
+	if !ok {
+		return nil, errors.New("failed to parse CA certificate")
+	}
+	return caCertPool, nil
 }

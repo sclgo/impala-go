@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -34,12 +35,14 @@ func TestIntegration_FromEnv(t *testing.T) {
 	runSuite(t, dsn)
 }
 
+// TestIntegration_Impala3 covers integration with Impala 3.x and no TLS - plain TCP
 func TestIntegration_Impala3(t *testing.T) {
 	fi.SkipLongTest(t)
-	dsn := startImpala(t)
+	dsn := startImpala3(t)
 	runSuite(t, dsn)
 }
 
+// TestIntegration_Impala4 covers integration with Impala 4.x and TLS
 func TestIntegration_Impala4(t *testing.T) {
 	fi.SkipLongTest(t)
 	dsn := startImpala4(t)
@@ -206,7 +209,7 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 	})
 }
 
-func startImpala(t *testing.T) string {
+func startImpala3(t *testing.T) string {
 	ctx := context.Background()
 	c := fi.NoError(Setup(ctx)).Require(t)
 	dsn := GetDsn(ctx, t, c)
@@ -233,7 +236,10 @@ func startImpala4(t *testing.T) string {
 	require.NoError(t, compose.WaitForService("impalad-1", waitRule).Up(ctx, tc.Wait(true)))
 	c, err := compose.ServiceContainer(ctx, "impalad-1")
 	require.NoError(t, err)
-	return GetDsn(ctx, t, c)
+	dsn := GetDsn(ctx, t, c)
+	certPath := filepath.Join("..", "..", "compose", "testssl", "localhost.crt")
+	dsn += "&tls=true&ca-cert=" + fi.NoError(filepath.Abs(certPath)).Require(t)
+	return dsn
 }
 
 func testPinger(t *testing.T, db *sql.DB) {
