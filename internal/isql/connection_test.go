@@ -341,13 +341,13 @@ func toCloser(ct testcontainers.Container) func() error {
 }
 
 func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
-	//nolint:staticcheck - deprecated but alternative doesn't allow customizing name; default name is invalid
+	//nolint - deprecated but alternative doesn't allow customizing name; default name is invalid
 	netReq := testcontainers.NetworkRequest{
 		Driver: "bridge",
 		Name:   "quickstart-network",
 	}
 
-	//nolint:staticcheck - deprecated see above
+	//nolint - deprecated see above
 	containerNet, err := testcontainers.GenericNetwork(ctx, testcontainers.GenericNetworkRequest{
 		NetworkRequest: netReq,
 	})

@@ -1,0 +1,4 @@
+issues:
+  exclude-dirs:
+    - "examples/"
+  exclude-generated: lax
