@@ -1,5 +1,8 @@
 package isql_test
 
+// Integration tests for driver
+// Create or update connection_int_test.go to add unit tests
+
 import (
 	"context"
 	"database/sql"
@@ -13,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/volume"
 	"github.com/samber/lo"
 	"github.com/sclgo/impala-go"
 	"github.com/sclgo/impala-go/internal/fi"
@@ -20,7 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
-	tc "github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
@@ -67,7 +70,7 @@ func TestIntegration_Restart(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	dsn := GetDsn(ctx, t, c)
+	dsn := getDsn(ctx, t, c)
 	t.Cleanup(func() {
 		err := c.Terminate(ctx)
 		assert.NoError(t, err)
@@ -212,7 +215,7 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 func startImpala3(t *testing.T) string {
 	ctx := context.Background()
 	c := fi.NoError(Setup(ctx)).Require(t)
-	dsn := GetDsn(ctx, t, c)
+	dsn := getDsn(ctx, t, c)
 	t.Cleanup(func() {
 		err := c.Terminate(ctx)
 		assert.NoError(t, err)
@@ -221,22 +224,9 @@ func startImpala3(t *testing.T) string {
 }
 
 func startImpala4(t *testing.T) string {
-	var compose tc.ComposeStack
-	compose, err := tc.NewDockerCompose("../../compose/quickstart.yml")
-	require.NoError(t, err)
-	compose = compose.WithEnv(map[string]string{
-		"IMPALA_QUICKSTART_IMAGE_PREFIX": "apache/impala:4.4.1-",
-		"QUICKSTART_LISTEN_ADDR":         "0.0.0.0",
-	})
-	t.Cleanup(func() {
-		assert.NoError(t, compose.Down(context.Background(), tc.RemoveOrphans(true)))
-	})
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	require.NoError(t, compose.WaitForService("impalad-1", waitRule).Up(ctx, tc.Wait(true)))
-	c, err := compose.ServiceContainer(ctx, "impalad-1")
-	require.NoError(t, err)
-	dsn := GetDsn(ctx, t, c)
+	ctx := context.Background()
+	c := setupStack(ctx, t)
+	dsn := getDsn(ctx, t, c)
 	certPath := filepath.Join("..", "..", "compose", "testssl", "localhost.crt")
 	dsn += "&tls=true&ca-cert=" + fi.NoError(filepath.Abs(certPath)).Require(t)
 	return dsn
@@ -344,7 +334,145 @@ func Setup(ctx context.Context) (testcontainers.Container, error) {
 	})
 }
 
-func GetDsn(ctx context.Context, t *testing.T, c testcontainers.Container) string {
+func toCloser(ct testcontainers.Container) func() error {
+	return func() error {
+		return ct.Terminate(context.Background())
+	}
+}
+
+func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
+	//nolint:staticcheck - deprecated but alternative doesn't allow customizing name; default name is invalid
+	netReq := testcontainers.NetworkRequest{
+		Driver: "bridge",
+		Name:   "quickstart-network",
+	}
+
+	//nolint:staticcheck - deprecated see above
+	containerNet, err := testcontainers.GenericNetwork(ctx, testcontainers.GenericNetworkRequest{
+		NetworkRequest: netReq,
+	})
+	require.NoError(t, err)
+	fi.CleanupF(t, fi.Bind(containerNet.Remove, context.Background()))
+
+	docker, err := testcontainers.NewDockerClientWithOpts(ctx)
+	require.NoError(t, err)
+	warehouseVol, err := docker.VolumeCreate(ctx, volume.CreateOptions{
+		Name: "impala-quickstart-warehouse",
+	})
+	require.NoError(t, err)
+	fi.CleanupF(t, func() error {
+		return docker.VolumeRemove(context.Background(), warehouseVol.Name, true)
+	})
+	warehouseMount := testcontainers.VolumeMount(warehouseVol.Name, "/user/hive/warehouse")
+	localHiveSite := fi.NoError(filepath.Abs("../../compose/quickstart_conf/hive-site.xml")).Require(t)
+
+	req := testcontainers.ContainerRequest{
+		Image:    "apache/impala:4.4.1-impala_quickstart_hms",
+		Cmd:      []string{"hms"},
+		Networks: []string{netReq.Name},
+		Mounts: testcontainers.ContainerMounts{
+			warehouseMount,
+			testcontainers.VolumeMount(warehouseVol.Name, "/var/lib/hive"),
+		},
+		Binds: []string{
+			localHiveSite + ":" + "/opt/hive/conf/hive-site.xml",
+		},
+		Name:       "quickstart-hive-metastore",
+		WaitingFor: wait.ForLog("Starting Hive Metastore Server"),
+	}
+	ct, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	require.NoError(t, err)
+	fi.CleanupF(t, toCloser(ct))
+
+	req = testcontainers.ContainerRequest{
+		Image: "apache/impala:4.4.1-statestored",
+		Cmd: []string{
+			"-redirect_stdout_stderr=false",
+			"-logtostderr",
+			"-v=1",
+		},
+		Networks: []string{netReq.Name},
+		Binds: []string{
+			// we use this deprecated field, because the alternative is much harder to use.
+			localHiveSite + ":" + "/opt/impala/conf/hive-site.xml",
+		},
+		Name:       "statestored",
+		WaitingFor: wait.ForLog("ThriftServer 'StatestoreService' started"),
+	}
+	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	require.NoError(t, err)
+	fi.CleanupF(t, toCloser(ct))
+
+	req = testcontainers.ContainerRequest{
+		Image: "apache/impala:4.4.1-catalogd",
+		Cmd: []string{
+			"-redirect_stdout_stderr=false",
+			"-logtostderr",
+			"-v=1",
+			"-hms_event_polling_interval_s=1",
+			"-invalidate_tables_timeout_s=999999",
+		},
+		Networks: []string{netReq.Name},
+		Binds: []string{
+			localHiveSite + ":" + "/opt/impala/conf/hive-site.xml",
+		},
+		Mounts: testcontainers.ContainerMounts{
+			warehouseMount,
+		},
+		Name: "catalogd",
+	}
+	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	require.NoError(t, err)
+	fi.CleanupF(t, toCloser(ct))
+
+	req = testcontainers.ContainerRequest{
+		Image: "apache/impala:4.4.1-impalad_coord_exec",
+		Cmd: []string{
+			"-v=1",
+			"-redirect_stdout_stderr=false",
+			"-logtostderr",
+			"-kudu_master_hosts=kudu-master-1:7051",
+			"-mt_dop_auto_fallback=true",
+			"-default_query_options=mt_dop=4,default_file_format=parquet,default_transactional_type=insert_only",
+			"-mem_limit=4gb",
+			"-ssl_server_certificate=/ssl/localhost.crt",
+			"-ssl_private_key=/ssl/localhost.key",
+		},
+		Networks: []string{netReq.Name},
+		Binds: []string{
+			localHiveSite + ":" + "/opt/impala/conf/hive-site.xml",
+			fi.NoError(filepath.Abs("../../compose/testssl")).Require(t) + ":" + "/ssl",
+		},
+		WaitingFor: waitRule,
+		Mounts: testcontainers.ContainerMounts{
+			warehouseMount,
+		},
+		Env: map[string]string{
+			"JAVA_TOOL_OPTIONS": "-Xmx1g",
+		},
+		ExposedPorts: []string{dbPort},
+		Name:         "impalad",
+	}
+	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	require.NoError(t, err)
+	fi.CleanupF(t, toCloser(ct))
+
+	return ct
+}
+
+func getDsn(ctx context.Context, t *testing.T, c testcontainers.Container) string {
 	port := fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port()
 	host := fi.NoError(c.Host(ctx)).Require(t)
 	u := &url.URL{

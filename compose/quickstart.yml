@@ -21,7 +21,8 @@
 # is in the impala-quickstart-warehouse volume, i.e. if you create a table in Impala, it
 # will be stored in that volume by default.
 #
-# See README.md in this directory for usage instructions.
+# impala-go: The compose spec is shortened to simplify using it for testing,
+# at the expense of other usage.
 services:
   hms:
     image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impala_quickstart_hms
@@ -39,9 +40,9 @@ services:
       - quickstart-network
   statestored:
     image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}statestored
-    ports:
-      # Web debug UI
-      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:25010:25010"
+    #    ports:
+    #      # Web debug UI
+    #      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:25010:25010"
     command: ["-redirect_stdout_stderr=false", "-logtostderr", "-v=1"]
     volumes:
       - ./quickstart_conf:/opt/impala/conf:ro
@@ -52,9 +53,9 @@ services:
       - statestored
       - hms
     image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}catalogd
-    ports:
-      # Web debug UI
-      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:25020:25020"
+    #    ports:
+    #      # Web debug UI
+    #      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:25020:25020"
     command: ["-redirect_stdout_stderr=false", "-logtostderr", "-v=1",
               "-hms_event_polling_interval_s=1", "-invalidate_tables_timeout_s=999999"]
     volumes:
@@ -70,14 +71,12 @@ services:
       - statestored
       - catalogd
     ports:
-      # Beeswax endpoint (deprecated)
-      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:21000:21000"
       # HS2 endpoint
-      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:21050:21050"
-      # Web debug UI
-      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:25000:25000"
+      - "21050:21050"
       # HS2 over HTTP endpoint.
-      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:28000:28000"
+      - "28000:28000"
+    #      # Web debug UI
+    #      - "25000:25000"
     command:
       - "-v=1"
       - "-redirect_stdout_stderr=false"
@@ -98,7 +97,6 @@ services:
     networks:
       - quickstart-network
 volumes:
-  impala-quickstart-hms:
   impala-quickstart-warehouse:
 
 networks:
