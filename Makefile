@@ -31,3 +31,11 @@ check_changes:
 # make sure .next.version contains the intended next version
 # if the following fails, update either the next version or undo any unintended api changes
 	go run golang.org/x/exp/cmd/gorelease@latest -version $(shell cat .next.version)
+
+check_deps:
+# checks for possibly leaked dependencies like in 
+# https://www.dolthub.com/blog/2022-11-07-pruning-test-dependencies-from-golang-binaries/
+	go build ./examples/enumerateDB.go	
+	strings enumerateDB | grep -m 1 github.com/sclgo/impala-go # sanity
+	! (strings enumerateDB | grep testify)
+	! (strings enumerateDB | grep docker)
