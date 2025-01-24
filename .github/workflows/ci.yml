@@ -26,6 +26,10 @@ jobs:
     - name: Test
       run: make test
 
+    - name: Checks
+      run: |
+        make check_changes
+
     - name: Send coverage
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}

@@ -14,7 +14,7 @@ usql:
 test-cli: usql
 	./usql -c "\drivers" | grep impala
 
-PKGS=$(shell exec go list ./... | grep -v "./internal/generated")
+PKGS=$(shell go list ./... | grep -v "./internal/generated")
 PKGS_LST=$(shell echo ${PKGS} | tr ' ' ',')
 test:
 	mkdir -p coverage/covdata
@@ -26,3 +26,8 @@ test:
 	# Convert to old text format for coveralls upload
 	go tool covdata textfmt -i=./coverage/covdata -o ./coverage/covprofile
 	go tool cover -html=./coverage/covprofile -o ./coverage/coverage.html
+
+check_changes:
+# make sure .next.version contains the intended next version
+# if the following fails, update either the next version or undo any unintended api changes
+	go run golang.org/x/exp/cmd/gorelease@latest -version $(shell cat .next.version)
