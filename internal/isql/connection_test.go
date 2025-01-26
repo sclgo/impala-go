@@ -16,7 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/volume"
+	"github.com/docker/go-units"
 	"github.com/samber/lo"
 	"github.com/sclgo/impala-go"
 	"github.com/sclgo/impala-go/internal/fi"
@@ -70,7 +72,7 @@ func TestIntegration_Restart(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	dsn := getDsn(ctx, t, c)
+	dsn := getDsn(ctx, t, c, nil)
 	t.Cleanup(func() {
 		err := c.Terminate(ctx)
 		assert.NoError(t, err)
@@ -215,7 +217,7 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 func startImpala3(t *testing.T) string {
 	ctx := context.Background()
 	c := fi.NoError(Setup(ctx)).Require(t)
-	dsn := getDsn(ctx, t, c)
+	dsn := getDsn(ctx, t, c, url.User("impala"))
 	t.Cleanup(func() {
 		err := c.Terminate(ctx)
 		assert.NoError(t, err)
@@ -226,8 +228,9 @@ func startImpala3(t *testing.T) string {
 func startImpala4(t *testing.T) string {
 	ctx := context.Background()
 	c := setupStack(ctx, t)
-	dsn := getDsn(ctx, t, c)
+	dsn := getDsn(ctx, t, c, url.UserPassword("fry", "fry"))
 	certPath := filepath.Join("..", "..", "compose", "testssl", "localhost.crt")
+	dsn += "&auth=ldap"
 	dsn += "&tls=true&ca-cert=" + fi.NoError(filepath.Abs(certPath)).Require(t)
 	return dsn
 }
@@ -435,6 +438,26 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 	fi.CleanupF(t, toCloser(ct))
 
 	req = testcontainers.ContainerRequest{
+		Image:      "ghcr.io/rroemhild/docker-test-openldap:master",
+		Networks:   []string{netReq.Name},
+		Name:       "ldapserver",
+		WaitingFor: wait.ForLog("slapd starting"),
+		HostConfigModifier: func(config *container.HostConfig) {
+			config.Resources.Ulimits = append(config.Resources.Ulimits, &units.Ulimit{
+				Name: "nofile",
+				Hard: 1024,
+				Soft: 1024,
+			})
+		},
+	}
+	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	require.NoError(t, err)
+	fi.CleanupF(t, toCloser(ct))
+
+	req = testcontainers.ContainerRequest{
 		Image: "apache/impala:4.4.1-impalad_coord_exec",
 		Cmd: []string{
 			"-v=1",
@@ -446,6 +469,13 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 			"-mem_limit=4gb",
 			"-ssl_server_certificate=/ssl/localhost.crt",
 			"-ssl_private_key=/ssl/localhost.key",
+			"-enable_ldap_auth",
+			"-ldap_uri=ldap://ldapserver:10389",
+			"-ldap_passwords_in_clear_ok",
+			"-ldap_search_bind_authentication",
+			"-ldap_allow_anonymous_binds=true",
+			"-ldap_user_search_basedn=ou=people,dc=planetexpress,dc=com",
+			"-ldap_user_filter=(&(objectClass=inetOrgPerson)(uid={0}))",
 		},
 		Networks: []string{netReq.Name},
 		Binds: []string{
@@ -461,6 +491,9 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		},
 		ExposedPorts: []string{dbPort},
 		Name:         "impalad",
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Consumers: []testcontainers.LogConsumer{&testcontainers.StdoutLogConsumer{}},
+		},
 	}
 	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -472,13 +505,14 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 	return ct
 }
 
-func getDsn(ctx context.Context, t *testing.T, c testcontainers.Container) string {
+func getDsn(ctx context.Context, t *testing.T, c testcontainers.Container, userinfo *url.Userinfo) string {
 	port := fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port()
 	host := fi.NoError(c.Host(ctx)).Require(t)
+
 	u := &url.URL{
 		Scheme:   "impala",
 		Host:     net.JoinHostPort(host, port),
-		User:     url.User("impala"),
+		User:     userinfo,
 		RawQuery: "log=stderr",
 	}
 	return u.String()

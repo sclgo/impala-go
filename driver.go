@@ -191,7 +191,10 @@ func connect(opts *Options) (*isql.Conn, error) {
 			RootCAs: caCertPool,
 		}
 		// Configuration applied in protocol below
-		socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{})
+		socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
+			// should generally be overwritten but setting just in case to avoid regressions like #50
+			TLSConfig: tlsConf,
+		})
 	} else {
 		socket = thrift.NewTSocketConf(addr, &thrift.TConfiguration{})
 	}

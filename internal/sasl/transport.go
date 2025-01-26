@@ -67,7 +67,7 @@ func (t *TSaslTransport) Open() error {
 	}
 
 	for {
-		status, challenge, err := t.recieve()
+		status, challenge, err := t.receive()
 		if err != nil {
 			return fmt.Errorf("sasl: negotiation failed. %v", err)
 		}
@@ -156,6 +156,10 @@ func (t *TSaslTransport) Close() error {
 	return t.trans.Close()
 }
 
+func (t *TSaslTransport) SetTConfiguration(conf *thrift.TConfiguration) {
+	thrift.PropagateTConfiguration(t.trans, conf)
+}
+
 func (t *TSaslTransport) negotiationSend(status Status, body []byte) error {
 	var payload []byte
 	payload = append(payload, byte(status))
@@ -174,7 +178,7 @@ func (t *TSaslTransport) negotiationSend(status Status, body []byte) error {
 	return nil
 }
 
-func (t *TSaslTransport) recieve() (Status, []byte, error) {
+func (t *TSaslTransport) receive() (Status, []byte, error) {
 	header := make([]byte, 5)
 	_, err := t.trans.Read(header)
 	if err != nil {
