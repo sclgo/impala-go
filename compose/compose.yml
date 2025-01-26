@@ -65,7 +65,7 @@ services:
       - ./quickstart_conf:/opt/impala/conf:ro
     networks:
       - quickstart-network
-  impalad-1:
+  impalad:
     image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impalad_coord_exec
     depends_on:
       - statestored
@@ -85,15 +85,22 @@ services:
       - "-mt_dop_auto_fallback=true"
       - "-default_query_options=mt_dop=4,default_file_format=parquet,default_transactional_type=insert_only"
       - "-mem_limit=4gb"
-      - "-ssl_server_certificate=/ssl/localhost.crt"
-      - "-ssl_private_key=/ssl/localhost.key"
+    #      - "-ssl_server_certificate=/ssl/localhost.crt"
+    #      - "-ssl_private_key=/ssl/localhost.key"
     environment:
       # Keep the Java heap small to preserve memory for query execution.
       - JAVA_TOOL_OPTIONS="-Xmx1g"
     volumes:
       - impala-quickstart-warehouse:/user/hive/warehouse
       - ./quickstart_conf:/opt/impala/conf:ro
-      - ./testssl:/ssl:ro
+    #      - ./testssl:/ssl:ro
+    networks:
+      - quickstart-network
+  healthcheck:
+    depends_on:
+      - impalad
+    build:
+      context: healthcheck
     networks:
       - quickstart-network
 volumes:
