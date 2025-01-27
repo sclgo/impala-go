@@ -53,45 +53,52 @@ func (rs *ResultSet) Next(dest []driver.Value) error {
 	return nil
 }
 
+// isSet checks if the i-th member of the provided bitmap is set. Each byte contains 8 bit flags.
+func isSet(bitmap []byte, i int) bool {
+	return bitmap[i/8]&(1<<(uint(i)%8)) != 0
+}
+
 func value(col *cli_service.TColumn, cd *ColDesc, i int) (interface{}, error) {
 	switch cd.DatabaseTypeName {
 	case "STRING", "CHAR", "VARCHAR":
-		if col.StringVal.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.StringVal.Nulls, i) {
 			return nil, nil
 		}
 		return col.StringVal.Values[i], nil
 	case "TINYINT":
-		if col.ByteVal.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.ByteVal.Nulls, i) {
 			return nil, nil
 		}
 		return col.ByteVal.Values[i], nil
 	case "SMALLINT":
-		if col.I16Val.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.I16Val.Nulls, i) {
 			return nil, nil
 		}
 		return col.I16Val.Values[i], nil
 	case "INT":
-		if col.I32Val.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.I32Val.Nulls, i) {
 			return nil, nil
 		}
 		return col.I32Val.Values[i], nil
 	case "BIGINT":
-		if col.I64Val.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.I64Val.Nulls, i) {
 			return nil, nil
 		}
 		return col.I64Val.Values[i], nil
 	case "BOOLEAN":
-		if col.BoolVal.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.BoolVal.Nulls, i) {
 			return nil, nil
 		}
 		return col.BoolVal.Values[i], nil
 	case "FLOAT", "DOUBLE":
-		if col.DoubleVal.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		// we could return float values as float32(col.DoubleVal.Values[i])
+		// but it is not worth the complexity
+		if isSet(col.DoubleVal.Nulls, i) {
 			return nil, nil
 		}
 		return col.DoubleVal.Values[i], nil
 	case "TIMESTAMP", "DATETIME":
-		if col.StringVal.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.StringVal.Nulls, i) {
 			return nil, nil
 		}
 		t, err := time.Parse(TimestampFormat, col.StringVal.Values[i])
@@ -100,7 +107,7 @@ func value(col *cli_service.TColumn, cd *ColDesc, i int) (interface{}, error) {
 		}
 		return t, nil
 	default:
-		if col.StringVal.Nulls[i/8]&(1<<(uint(i)%8)) != 0 {
+		if isSet(col.StringVal.Nulls, i) {
 			return nil, nil
 		}
 		return col.StringVal.Values[i], nil

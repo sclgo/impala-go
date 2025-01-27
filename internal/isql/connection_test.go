@@ -8,10 +8,14 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"log"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -28,6 +32,12 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+func init() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+}
 
 func TestIntegration_FromEnv(t *testing.T) {
 	fi.SkipLongTest(t)
@@ -272,11 +282,25 @@ func testSelect(t *testing.T, db *sql.DB) {
 	require.NoError(t, err)
 	for _, tt := range tests {
 		t.Run(tt.sql, func(t *testing.T) {
-			err = conn.QueryRowContext(ctx, fmt.Sprintf("select %s", tt.sql)).Scan(&res)
+			query := fmt.Sprintf("select %s", tt.sql)
+			row := conn.QueryRowContext(ctx, query)
+			err = row.Scan(&res)
 			require.NoError(t, err)
-			require.Equal(t, tt.res, res)
+			require.NoError(t, row.Err())
+			expected := tt.res
+			require.Equal(t, expected, res)
+
+			checkScanType(ctx, t, conn, query, expected)
 		})
 	}
+}
+
+func checkScanType(ctx context.Context, t *testing.T, conn *sql.Conn, query string, expected any) {
+	dbRes := fi.NoError(conn.QueryContext(ctx, query)).Require(t)
+	defer fi.NoErrorF(dbRes.Close, t)
+	colTypes := fi.NoError(dbRes.ColumnTypes()).Require(t)
+	require.Equal(t, reflect.TypeOf(expected).String(), colTypes[0].ScanType().String())
+	require.Equal(t, reflect.TypeOf(expected), colTypes[0].ScanType())
 }
 
 func testMetadata(t *testing.T, conn *sql.DB) {
@@ -337,8 +361,9 @@ func Setup(ctx context.Context) (testcontainers.Container, error) {
 	})
 }
 
-func toCloser(ct testcontainers.Container) func() error {
+func toCloser(ct testcontainers.Container, t *testing.T) func() error {
 	return func() error {
+		t.Log("Terminating container", ct.GetContainerID())
 		return ct.Terminate(context.Background())
 	}
 }
@@ -388,7 +413,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Started:          true,
 	})
 	require.NoError(t, err)
-	fi.CleanupF(t, toCloser(ct))
+	fi.CleanupF(t, toCloser(ct, t))
 
 	req = testcontainers.ContainerRequest{
 		Image: "apache/impala:4.4.1-statestored",
@@ -410,7 +435,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Started:          true,
 	})
 	require.NoError(t, err)
-	fi.CleanupF(t, toCloser(ct))
+	fi.CleanupF(t, toCloser(ct, t))
 
 	req = testcontainers.ContainerRequest{
 		Image: "apache/impala:4.4.1-catalogd",
@@ -435,7 +460,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Started:          true,
 	})
 	require.NoError(t, err)
-	fi.CleanupF(t, toCloser(ct))
+	fi.CleanupF(t, toCloser(ct, t))
 
 	req = testcontainers.ContainerRequest{
 		Image:      "ghcr.io/rroemhild/docker-test-openldap:master",
@@ -455,7 +480,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Started:          true,
 	})
 	require.NoError(t, err)
-	fi.CleanupF(t, toCloser(ct))
+	fi.CleanupF(t, toCloser(ct, t))
 
 	req = testcontainers.ContainerRequest{
 		Image: "apache/impala:4.4.1-impalad_coord_exec",
@@ -500,7 +525,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Started:          true,
 	})
 	require.NoError(t, err)
-	fi.CleanupF(t, toCloser(ct))
+	fi.CleanupF(t, toCloser(ct, t))
 
 	return ct
 }

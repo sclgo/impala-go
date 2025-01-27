@@ -24,7 +24,9 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: make test
+      run: |
+        sudo apt-get install moreutils -y
+        make test
 
     - name: Checks
       run: |
