@@ -106,6 +106,8 @@ services:
       context: healthcheck
     networks:
       - quickstart-network
+    volumes:
+      - impala-quickstart-warehouse:/user/hive/warehouse
 volumes:
   impala-quickstart-warehouse:
 
