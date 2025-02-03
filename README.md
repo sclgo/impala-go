@@ -156,6 +156,8 @@ func main() {
 }
 ```
 
+Check out also [an open data end-to-end demo](compose/README.md).
+
 ## Support
 
 The library is actively tested with Impala 4.1 and 3.4.
