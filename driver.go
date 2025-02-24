@@ -63,17 +63,12 @@ func parseURI(uri string) (*Options, error) {
 		}
 	}
 
-	if !strings.Contains(u.Host, ":") {
-		u.Host = fmt.Sprintf("%s:%s", u.Host, DefaultOptions.Port)
-	}
+	opts.Host = u.Hostname()
+	opts.Port = u.Port()
 
-	host, port, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		return nil, err
+	if opts.Port == "" {
+		opts.Port = DefaultOptions.Port
 	}
-
-	opts.Host = host
-	opts.Port = port
 
 	query := u.Query()
 	auth := query.Get("auth")
@@ -85,7 +80,7 @@ func parseURI(uri string) (*Options, error) {
 	if ok {
 		v, err := strconv.ParseBool(useTls[0])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid tls value: %w", err)
 		}
 		opts.UseTLS = v
 	}
@@ -95,22 +90,14 @@ func parseURI(uri string) (*Options, error) {
 		opts.CACertPath = caCert[0]
 	}
 
-	batchSize, ok := query["batch-size"]
-	if ok {
-		size, err := strconv.Atoi(batchSize[0])
-		if err != nil {
-			return nil, err
-		}
-		opts.BatchSize = size
+	err = parseIntKey(query, "batch-size", &opts.BatchSize)
+	if err != nil {
+		return nil, err
 	}
 
-	bufferSize, ok := query["buffer-size"]
-	if ok {
-		size, err := strconv.Atoi(bufferSize[0])
-		if err != nil {
-			return nil, err
-		}
-		opts.BufferSize = size
+	err = parseIntKey(query, "buffer-size", &opts.BufferSize)
+	if err != nil {
+		return nil, err
 	}
 
 	memLimit, ok := query["mem-limit"]
@@ -118,13 +105,9 @@ func parseURI(uri string) (*Options, error) {
 		opts.MemoryLimit = memLimit[0]
 	}
 
-	queryTimeout, ok := query["query-timeout"]
-	if ok {
-		qTimeout, err := strconv.Atoi(queryTimeout[0])
-		if err != nil {
-			return nil, err
-		}
-		opts.QueryTimeout = qTimeout
+	err = parseIntKey(query, "query-timeout", &opts.QueryTimeout)
+	if err != nil {
+		return nil, err
 	}
 
 	logDest, ok := query["log"]
@@ -135,6 +118,17 @@ func parseURI(uri string) (*Options, error) {
 	}
 
 	return &opts, nil
+}
+
+func parseIntKey(query url.Values, key string, target *int) (err error) {
+	values, ok := query[key]
+	if ok {
+		*target, err = strconv.Atoi(values[0])
+		if err != nil {
+			err = fmt.Errorf("invalid %s: %w", key, err)
+		}
+	}
+	return
 }
 
 // OpenConnector parses name and return connector with fixed options
