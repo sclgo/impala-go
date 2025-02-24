@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/sclgo/impala-go/internal/hive"
 )
@@ -32,17 +31,8 @@ func (s *Stmt) NumInput() int {
 	return -1
 }
 
-// CheckNamedValue is called before passing arguments to the driver
-// and is called in place of any ColumnConverter. CheckNamedValue must do type
-// validation and conversion as appropriate for the driver.
-func (s *Stmt) CheckNamedValue(val *driver.NamedValue) error {
-	t, ok := val.Value.(time.Time)
-	if ok {
-		val.Value = t.Format(hive.TimestampFormat)
-		return nil
-	}
-	return driver.ErrSkip
-}
+// Stmt does not need to implement https://pkg.go.dev/database/sql/driver#NamedValueChecker
+// if it wouldn't add anything to the Conn impl. of the same interface.
 
 // Exec executes a query that doesn't return rows
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
@@ -60,22 +50,14 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 
 // QueryContext executes a query that may return rows
 func (s *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	session, err := s.conn.OpenSession(ctx)
-	if err != nil {
-		return nil, err
-	}
-	stmt := statement(s.stmt, args)
-	return query(ctx, session, stmt)
+	// It is slightly ineffecient to call template() again via conn.QueryContext
+	// but the simpler code is worth it.
+	return s.conn.QueryContext(ctx, s.stmt, args)
 }
 
 // ExecContext executes a query that doesn't return rows
 func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	session, err := s.conn.OpenSession(ctx)
-	if err != nil {
-		return nil, err
-	}
-	stmt := statement(s.stmt, args)
-	return exec(ctx, session, stmt)
+	return s.conn.ExecContext(ctx, s.stmt, args)
 }
 
 func template(query string) string {

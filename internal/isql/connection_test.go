@@ -26,6 +26,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/sclgo/impala-go"
 	"github.com/sclgo/impala-go/internal/fi"
+	"github.com/sclgo/impala-go/internal/hive"
 	"github.com/sclgo/impala-go/internal/sclerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -325,22 +326,28 @@ func testMetadata(t *testing.T, conn *sql.DB) {
 }
 
 func testInsert(t *testing.T, conn *sql.DB) {
+	now := time.Now()
 	var err error
 	_, err = conn.Exec("DROP TABLE IF EXISTS test")
 	require.NoError(t, err)
-	_, err = conn.Exec("CREATE TABLE test(a int)")
+	_, err = conn.Exec("CREATE TABLE test(a varchar)")
 	require.NoError(t, err)
-	insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (?)", 1)
+	insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (?)", now)
 	require.NoError(t, err)
 	_, err = insertRes.RowsAffected()
 	require.Error(t, err) // not supported yet, see todo in statement.go/exec
-	selectRes, err := conn.Query("SELECT * FROM test WHERE a = ? LIMIT 1", 1)
+
+	// Use Prepare to exercise that codepath
+	st, err := conn.Prepare("SELECT * FROM test WHERE a = ? LIMIT 1")
+	require.NoError(t, err)
+	selectRes, err := st.Query(now)
 	require.NoError(t, err)
 	defer fi.NoErrorF(selectRes.Close, t)
 	require.True(t, selectRes.Next())
-	var val int
+	var val string
 	require.NoError(t, selectRes.Scan(&val))
-	require.Equal(t, val, 1)
+	require.Equal(t, now.Format(hive.TimestampFormat), val)
+	require.NoError(t, st.Close()) // close is no-op anyway
 }
 
 const dbPort = "21050/tcp"
