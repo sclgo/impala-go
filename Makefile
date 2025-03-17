@@ -32,6 +32,8 @@ test:
 	go tool covdata textfmt -i=./coverage/covdata -o ./coverage/covprofile
 	go tool cover -html=./coverage/covprofile -o ./coverage/coverage.html
 
+checks: check_changes check_deps check_tidy
+
 check_changes:
 # make sure .next.version contains the intended next version
 # if the following fails, update either the next version or undo any unintended api changes
@@ -44,3 +46,8 @@ check_deps:
 	strings enumerateDB | grep -m 1 github.com/sclgo/impala-go # sanity
 	! (strings enumerateDB | grep testify)
 	! (strings enumerateDB | grep docker)
+
+check_tidy:
+	go mod tidy
+	# Verify that `go mod tidy` didn't introduce any changes. Run go mod tidy before pushing.
+	git diff --exit-code --stat go.mod go.sum

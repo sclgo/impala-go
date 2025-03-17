@@ -2,11 +2,10 @@ module github.com/sclgo/impala-go
 
 go 1.23.0
 
-toolchain go1.23.1
-
 require (
 	github.com/apache/thrift v0.19.0
 	github.com/docker/docker v27.4.1+incompatible
+	github.com/docker/go-units v0.5.0
 	github.com/google/uuid v1.6.0
 	github.com/samber/lo v1.47.0
 	github.com/stretchr/testify v1.10.0
@@ -26,7 +25,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
