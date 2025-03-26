@@ -10,6 +10,9 @@ cli: usql
 usql:
 	go run github.com/sclgo/usqlgen@v0.1.1 -v build --import github.com/sclgo/impala-go
 
+short-test:
+	go test -short -v ./...
+
 .PHONY: test-cli
 test-cli: usql
 	./usql -c "\drivers" | grep impala

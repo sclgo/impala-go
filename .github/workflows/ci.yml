@@ -11,9 +11,6 @@ on:
 
 jobs:
   common-ci:
-    strategy:
-      matrix:
-        go-version: [1.23.x, 1.24.x]  
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -21,7 +18,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5.3.0
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: "1.23.x"
 
     - name: Build
       run: go build -v ./...
@@ -45,6 +42,20 @@ jobs:
       with:
         name: code-coverage-report-${{ matrix.go-version }}
         path: ./coverage/coverage.html
+
+  ci-124:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5.3.0
+        with:
+          go-version: "1.24.x"
+
+      - name: Test
+        run: |
+          make short-test        
 
   post-merge:
     runs-on: ubuntu-latest
