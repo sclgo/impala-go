@@ -42,6 +42,10 @@ func TestParseURI(t *testing.T) {
 			Options{Host: "localhost", Port: "21050", UseTLS: true, CACertPath: "/etc/ca.crt", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
 		},
 		{
+			"impala://localhost?tls=true",
+			Options{Host: "localhost", Port: "21050", UseTLS: true, BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+		},
+		{
 			"impala://localhost?batch-size=2048&buffer-size=2048",
 			Options{Host: "localhost", Port: "21050", BatchSize: 2048, BufferSize: 2048, LogOut: io.Discard},
 		},
@@ -64,20 +68,24 @@ func TestParseURI_Negative(t *testing.T) {
 	drv := &Driver{}
 	t.Run("scheme", func(t *testing.T) {
 		_, err := drv.Open("notimpala://")
+		require.ErrorContains(t, err, badDSNErrorPrefix)
 		require.ErrorContains(t, err, "notimpala")
 	})
 	t.Run("invalidurl", func(t *testing.T) {
 		_, err := drv.Open("impala://user:pass???@localhost")
+		require.ErrorContains(t, err, badDSNErrorPrefix)
 		require.ErrorContains(t, err, "parse")
 	})
 	for _, key := range []string{"batch-size", "buffer-size", "query-timeout", "tls"} {
 		t.Run("invalid "+key, func(t *testing.T) {
 			_, err := drv.Open(fmt.Sprintf("impala://localhost?%s=aa", key))
+			require.ErrorContains(t, err, badDSNErrorPrefix)
 			require.ErrorContains(t, err, "invalid "+key)
 		})
 	}
 	t.Run("invalid ca-cert", func(t *testing.T) {
 		_, err := drv.Open("impala://localhost?tls=true&ca-cert=aa")
+		require.ErrorContains(t, err, badDSNErrorPrefix)
 		require.ErrorContains(t, err, "certificate")
 	})
 }

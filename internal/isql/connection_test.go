@@ -5,6 +5,7 @@ package isql_test
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +34,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+var (
+	impala4User = url.UserPassword("fry", "fry")
 )
 
 func init() {
@@ -223,6 +229,21 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 		_, err = db.Exec("CREATE EXTERNAL TABLE test(a int) LOCATION 's3a://daylight-openstreetmap/earth'")
 		require.ErrorContains(t, err, "ClassNotFoundException")
 	})
+
+	t.Run("built-in certs", func(t *testing.T) {
+		noCertsDsnUrl, err := url.Parse(dsn)
+		require.NoError(t, err)
+		query := noCertsDsnUrl.Query()
+		query.Del("ca-cert")
+		noCertsDsnUrl.RawQuery = query.Encode()
+		builtInCertsDb := fi.NoError(sql.Open("impala", noCertsDsnUrl.String())).Require(t)
+		defer fi.NoErrorF(builtInCertsDb.Close, t)
+		err = builtInCertsDb.Ping()
+		require.Falsef(t, strings.Contains(err.Error(), "bad dsn"), "actual dsn: %s", err)
+		require.ErrorContains(t, err, "using system root CAs")
+		expectedErrorType := &tls.CertificateVerificationError{}
+		require.ErrorAs(t, err, &expectedErrorType)
+	})
 }
 
 func startImpala3(t *testing.T) string {
@@ -239,7 +260,7 @@ func startImpala3(t *testing.T) string {
 func startImpala4(t *testing.T) string {
 	ctx := context.Background()
 	c := setupStack(ctx, t)
-	dsn := getDsn(ctx, t, c, url.UserPassword("fry", "fry"))
+	dsn := getDsn(ctx, t, c, impala4User)
 	certPath := filepath.Join("..", "..", "compose", "testssl", "localhost.crt")
 	dsn += "&auth=ldap"
 	dsn += "&tls=true&ca-cert=" + fi.NoError(filepath.Abs(certPath)).Require(t)

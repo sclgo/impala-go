@@ -26,14 +26,20 @@ var (
 	ErrNotSupported = isql.ErrNotSupported
 )
 
+const (
+	badDSNErrorPrefix = "impala: bad DSN: "
+)
+
 // Driver to impala
 type Driver struct{}
 
-// Open creates new connection to impala
-func (d *Driver) Open(uri string) (driver.Conn, error) {
-	opts, err := parseURI(uri)
+// Open creates new connection to impala using the given data source name. Implements driver.Driver.
+// Returned error wraps any errors coming from thrift or stdlib - typically crypto or net packages.
+// If TLS is requested, and server certificate fails validation, error chain includes *tls.CertificateVerificationError
+func (d *Driver) Open(dsn string) (driver.Conn, error) {
+	opts, err := parseURI(dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(badDSNErrorPrefix+"%w", err)
 	}
 
 	conn, err := connect(opts)
@@ -131,7 +137,8 @@ func parseIntKey(query url.Values, key string, target *int) (err error) {
 	return
 }
 
-// OpenConnector parses name and return connector with fixed options
+// OpenConnector parses name as a DSN (data source name) and returns connector with fixed options
+// Implements driver.DriverContext
 func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 
 	opts, err := parseURI(name)
@@ -153,6 +160,7 @@ func NewConnector(opts *Options) driver.Connector {
 }
 
 // Connect implements driver.Connector
+// See Driver.Open for details about error results
 func (c *connector) Connect(context.Context) (driver.Conn, error) {
 	// TTransport.Open doesn't support context. In general, Thrift almost always doesn't accept or ignores context.
 	return connect(c.opts)
@@ -164,26 +172,56 @@ func (c *connector) Driver() driver.Driver {
 }
 
 func connect(opts *Options) (*isql.Conn, error) {
+	transport, tlsConf, err := configureTransport(opts)
+	if err != nil {
+		return nil, fmt.Errorf(badDSNErrorPrefix+"%w", err)
+	}
 
+	protocol := thrift.NewTBinaryProtocolConf(transport, &thrift.TConfiguration{
+		// The following configuration is propagated to Transport / Socket
+		TBinaryStrictRead:  lo.ToPtr(false),
+		TBinaryStrictWrite: lo.ToPtr(true),
+		TLSConfig:          tlsConf,
+		// TODO SocketTimeout, ConnectTimeout Github #34
+	})
+
+	if err = transport.Open(); err != nil {
+		addInfo := ""
+		if tlsConf != nil && tlsConf.RootCAs == nil {
+			addInfo = " using system root CAs"
+		}
+		return nil, fmt.Errorf("impala: failed to open connection%s: %w", addInfo, err)
+	}
+
+	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
+
+	tclient := thrift.NewTStandardClient(protocol, protocol)
+	client := hive.NewClient(tclient, logger, &hive.Options{
+		MaxRows:      int64(opts.BatchSize),
+		MemLimit:     opts.MemoryLimit,
+		QueryTimeout: opts.QueryTimeout,
+	})
+
+	return isql.NewConn(client, transport, logger), nil
+}
+
+func configureTransport(opts *Options) (thrift.TTransport, *tls.Config, error) {
 	addr := net.JoinHostPort(opts.Host, opts.Port)
 
 	var socket thrift.TTransport
 	var tlsConf *tls.Config
 	if opts.UseTLS {
 
-		certPath := opts.CACertPath
-		if certPath == "" {
-			return nil, errors.New("impala: please provide CA certificate path")
+		tlsConf = &tls.Config{}
+		if certPath := opts.CACertPath; certPath != "" {
+			caCertPool, err := readCert(certPath)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to read CA certificate: %w", err)
+			}
+			tlsConf.RootCAs = caCertPool
 		}
+		// otherwise "host's root CA set" is used
 
-		caCertPool, err := readCert(certPath)
-		if err != nil {
-			return nil, fmt.Errorf("impala: failed to read CA certificate: %w", err)
-		}
-
-		tlsConf = &tls.Config{
-			RootCAs: caCertPool,
-		}
 		// Configuration applied in protocol below
 		socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
 			// should generally be overwritten but setting just in case to avoid regressions like #50
@@ -198,11 +236,11 @@ func connect(opts *Options) (*isql.Conn, error) {
 	if opts.UseLDAP {
 
 		if opts.Username == "" {
-			return nil, errors.New("Please provide username for LDAP auth")
+			return nil, nil, errors.New("provide username for LDAP auth")
 		}
 
 		if opts.Password == "" {
-			return nil, errors.New("Please provide password for LDAP auth")
+			return nil, nil, errors.New("provide password for LDAP auth")
 		}
 
 		transport, err = sasl.NewTSaslTransport(socket, &sasl.Options{
@@ -212,34 +250,15 @@ func connect(opts *Options) (*isql.Conn, error) {
 		})
 
 		if err != nil {
-			return nil, err
+			// This never happens in the current version of thrift.
+			// NewTSaslTransport always returns nil error
+			return nil, nil, err
 		}
 	} else {
 		transport = thrift.NewTBufferedTransport(socket, opts.BufferSize)
 	}
 
-	protocol := thrift.NewTBinaryProtocolConf(transport, &thrift.TConfiguration{
-		// The following configuration is propagated to Transport / Socket
-		TBinaryStrictRead:  lo.ToPtr(false),
-		TBinaryStrictWrite: lo.ToPtr(true),
-		TLSConfig:          tlsConf,
-		// TODO SocketTimeout, ConnectTimeout Github #34
-	})
-
-	if err := transport.Open(); err != nil {
-		return nil, fmt.Errorf("impala: failed to open connection: %w", err)
-	}
-
-	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
-
-	tclient := thrift.NewTStandardClient(protocol, protocol)
-	client := hive.NewClient(tclient, logger, &hive.Options{
-		MaxRows:      int64(opts.BatchSize),
-		MemLimit:     opts.MemoryLimit,
-		QueryTimeout: opts.QueryTimeout,
-	})
-
-	return isql.NewConn(client, transport, logger), nil
+	return transport, tlsConf, nil
 }
 
 func readCert(certPath string) (*x509.CertPool, error) {
