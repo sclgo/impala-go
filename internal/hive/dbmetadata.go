@@ -116,7 +116,10 @@ func read[T any](ctx context.Context, op *Operation, rs *ResultSet, rowLength in
 	if ctx.Err() != nil {
 		err = ctx.Err()
 	}
-	_ = withFallbackCtx(ctx, op.Close)
+	_ = withFallbackCtx(ctx, func(ctx context.Context) error {
+		_, err := op.Close(ctx)
+		return err
+	})
 	return err
 }
 

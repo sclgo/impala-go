@@ -355,8 +355,9 @@ func testInsert(t *testing.T, conn *sql.DB) {
 	require.NoError(t, err)
 	insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (?)", now)
 	require.NoError(t, err)
-	_, err = insertRes.RowsAffected()
-	require.Error(t, err) // not supported yet, see todo in statement.go/exec
+	rowsAdded, err := insertRes.RowsAffected()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), rowsAdded)
 
 	// Use Prepare to exercise that codepath
 	st, err := conn.Prepare("SELECT * FROM test WHERE a = ? LIMIT 1")

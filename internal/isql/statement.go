@@ -113,7 +113,10 @@ func query(ctx context.Context, session *hive.Session, stmt string) (driver.Rows
 		rs:     rs,
 		schema: schema,
 		// TODO align context handling with database/sql practices (Github #14)
-		closefn: func() error { return operation.Close(ctx) },
+		closefn: func() error {
+			_, err := operation.Close(ctx)
+			return err
+		},
 	}, nil
 }
 
@@ -130,14 +133,10 @@ func exec(ctx context.Context, session *hive.Session, stmt string) (driver.Resul
 		return nil, err
 	}
 
-	// TODO (Github #3) Like impala-shell, use regex to check if statement is DML,
-	// and use services.impalaservice.ImpalaServiceClient.CloseInsert to close operation
-	// to be able to retrieve modified rows
-	// DML_REGEX = re.compile("^(insert|upsert|update|delete)$", re.I)
-
-	if err = operation.Close(ctx); err != nil {
+	rowsAffected, err := operation.Close(ctx)
+	if err != nil {
 		return nil, err
 	}
 
-	return driver.ResultNoRows, nil
+	return driver.RowsAffected(rowsAffected), nil
 }

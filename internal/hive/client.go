@@ -7,11 +7,12 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/sclgo/impala-go/internal/generated/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/impalaservice"
 )
 
 // Client represents Hive Client
 type Client struct {
-	client cli_service.TCLIService
+	client impalaservice.ImpalaHiveServer2Service
 	opts   *Options
 	log    *log.Logger
 }
@@ -26,7 +27,7 @@ type Options struct {
 // NewClient creates Hive Client
 func NewClient(client thrift.TClient, log *log.Logger, opts *Options) *Client {
 	return &Client{
-		client: cli_service.NewTCLIServiceClient(client),
+		client: impalaservice.NewImpalaHiveServer2ServiceClient(client),
 		log:    log,
 		opts:   opts,
 	}

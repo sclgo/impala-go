@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/sclgo/impala-go/internal/generated/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/impalaservice"
 )
 
 const (
@@ -168,20 +169,34 @@ func nextDuration(duration time.Duration) time.Duration {
 }
 
 // Close closes operation
-func (op *Operation) Close(ctx context.Context) error {
-	req := cli_service.TCloseOperationReq{
+func (op *Operation) Close(ctx context.Context) (int64, error) {
+	req := impalaservice.TCloseImpalaOperationReq{
 		OperationHandle: op.h,
 	}
-	resp, err := op.hive.client.CloseOperation(ctx, &req)
+	resp, err := op.hive.client.CloseImpalaOperation(ctx, &req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err := checkStatus(resp); err != nil {
-		return err
+		return 0, err
 	}
 
 	op.hive.log.Printf("close operation: %v", guid(op.h.OperationId.GUID))
-	return nil
+	return calcRowsAffected(resp), nil
+}
+
+func calcRowsAffected(resp *impalaservice.TCloseImpalaOperationResp) int64 {
+	if resp.DmlResult_ == nil {
+		return 0
+	}
+	var result int64
+	for _, v := range resp.DmlResult_.GetRowsModified() {
+		result += v
+	}
+	for _, v := range resp.DmlResult_.GetRowsDeleted() {
+		result += v
+	}
+	return result
 }
 
 // sleep sleeps in a context aware way

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sclgo/impala-go/internal/generated/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/impalaservice"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,7 +47,7 @@ func TestDBMetadata_GetTablesSeq(t *testing.T) {
 }
 
 type thriftClient struct {
-	cli_service.TCLIService
+	impalaservice.ImpalaHiveServer2Service
 
 	closeCalls      int
 	getTablesResp   *cli_service.TGetTablesResp
@@ -67,9 +68,9 @@ func (m *thriftClient) FetchResults(context.Context, *cli_service.TFetchResultsR
 	}, nil
 }
 
-func (m *thriftClient) CloseOperation(context.Context, *cli_service.TCloseOperationReq) (*cli_service.TCloseOperationResp, error) {
+func (m *thriftClient) CloseImpalaOperation(context.Context, *impalaservice.TCloseImpalaOperationReq) (*impalaservice.TCloseImpalaOperationResp, error) {
 	m.closeCalls++
-	return &cli_service.TCloseOperationResp{
+	return &impalaservice.TCloseImpalaOperationResp{
 		Status: &cli_service.TStatus{
 			StatusCode: cli_service.TStatusCode_SUCCESS_STATUS,
 		},

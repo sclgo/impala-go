@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/sclgo/impala-go/internal/generated/cli_service"
+	"github.com/sclgo/impala-go/internal/generated/impalaservice"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,7 +33,7 @@ func TestOperation(t *testing.T) {
 
 type opThriftClient struct {
 	called bool
-	cli_service.TCLIService
+	impalaservice.ImpalaHiveServer2Service
 }
 
 func (c *opThriftClient) GetOperationStatus(ctx context.Context, _ *cli_service.TGetOperationStatusReq) (*cli_service.TGetOperationStatusResp, error) {
