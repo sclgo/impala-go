@@ -13598,6 +13598,7 @@ func (p *TGetOperationStatusReq) Validate() error {
 //  - SqlState
 //  - ErrorCode
 //  - ErrorMessage
+//  - HasResultSet
 // 
 type TGetOperationStatusResp struct {
 	Status *TStatus `thrift:"status,1,required" db:"status" json:"status"`
@@ -13605,6 +13606,8 @@ type TGetOperationStatusResp struct {
 	SqlState *string `thrift:"sqlState,3" db:"sqlState" json:"sqlState,omitempty"`
 	ErrorCode *int32 `thrift:"errorCode,4" db:"errorCode" json:"errorCode,omitempty"`
 	ErrorMessage *string `thrift:"errorMessage,5" db:"errorMessage" json:"errorMessage,omitempty"`
+	// unused fields # 6 to 8
+	HasResultSet *bool `thrift:"hasResultSet,9" db:"hasResultSet" json:"hasResultSet,omitempty"`
 }
 
 func NewTGetOperationStatusResp() *TGetOperationStatusResp {
@@ -13656,6 +13659,15 @@ func (p *TGetOperationStatusResp) GetErrorMessage() string {
 	return *p.ErrorMessage
 }
 
+var TGetOperationStatusResp_HasResultSet_DEFAULT bool
+
+func (p *TGetOperationStatusResp) GetHasResultSet() bool {
+	if !p.IsSetHasResultSet() {
+		return TGetOperationStatusResp_HasResultSet_DEFAULT
+	}
+	return *p.HasResultSet
+}
+
 func (p *TGetOperationStatusResp) IsSetStatus() bool {
 	return p.Status != nil
 }
@@ -13674,6 +13686,10 @@ func (p *TGetOperationStatusResp) IsSetErrorCode() bool {
 
 func (p *TGetOperationStatusResp) IsSetErrorMessage() bool {
 	return p.ErrorMessage != nil
+}
+
+func (p *TGetOperationStatusResp) IsSetHasResultSet() bool {
+	return p.HasResultSet != nil
 }
 
 func (p *TGetOperationStatusResp) Read(ctx context.Context, iprot thrift.TProtocol) error {
@@ -13736,6 +13752,16 @@ func (p *TGetOperationStatusResp) Read(ctx context.Context, iprot thrift.TProtoc
 		case 5:
 			if fieldTypeId == thrift.STRING {
 				if err := p.ReadField5(ctx, iprot); err != nil {
+					return err
+				}
+			} else {
+				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+					return err
+				}
+			}
+		case 9:
+			if fieldTypeId == thrift.BOOL {
+				if err := p.ReadField9(ctx, iprot); err != nil {
 					return err
 				}
 			} else {
@@ -13806,6 +13832,15 @@ func (p *TGetOperationStatusResp) ReadField5(ctx context.Context, iprot thrift.T
 	return nil
 }
 
+func (p *TGetOperationStatusResp) ReadField9(ctx context.Context, iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadBool(ctx); err != nil {
+		return thrift.PrependError("error reading field 9: ", err)
+	} else {
+		p.HasResultSet = &v
+	}
+	return nil
+}
+
 func (p *TGetOperationStatusResp) Write(ctx context.Context, oprot thrift.TProtocol) error {
 	if err := oprot.WriteStructBegin(ctx, "TGetOperationStatusResp"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
@@ -13816,6 +13851,7 @@ func (p *TGetOperationStatusResp) Write(ctx context.Context, oprot thrift.TProto
 		if err := p.writeField3(ctx, oprot); err != nil { return err }
 		if err := p.writeField4(ctx, oprot); err != nil { return err }
 		if err := p.writeField5(ctx, oprot); err != nil { return err }
+		if err := p.writeField9(ctx, oprot); err != nil { return err }
 	}
 	if err := oprot.WriteFieldStop(ctx); err != nil {
 		return thrift.PrependError("write field stop error: ", err)
@@ -13899,6 +13935,21 @@ func (p *TGetOperationStatusResp) writeField5(ctx context.Context, oprot thrift.
 	return err
 }
 
+func (p *TGetOperationStatusResp) writeField9(ctx context.Context, oprot thrift.TProtocol) (err error) {
+	if p.IsSetHasResultSet() {
+		if err := oprot.WriteFieldBegin(ctx, "hasResultSet", thrift.BOOL, 9); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T write field begin error 9:hasResultSet: ", p), err)
+		}
+		if err := oprot.WriteBool(ctx, bool(*p.HasResultSet)); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T.hasResultSet (9) field write error: ", p), err)
+		}
+		if err := oprot.WriteFieldEnd(ctx); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T write field end error 9:hasResultSet: ", p), err)
+		}
+	}
+	return err
+}
+
 func (p *TGetOperationStatusResp) Equals(other *TGetOperationStatusResp) bool {
 	if p == other {
 		return true
@@ -13929,6 +13980,12 @@ func (p *TGetOperationStatusResp) Equals(other *TGetOperationStatusResp) bool {
 			return false
 		}
 		if (*p.ErrorMessage) != (*other.ErrorMessage) { return false }
+	}
+	if p.HasResultSet != other.HasResultSet {
+		if p.HasResultSet == nil || other.HasResultSet == nil {
+			return false
+		}
+		if (*p.HasResultSet) != (*other.HasResultSet) { return false }
 	}
 	return true
 }
@@ -14851,11 +14908,13 @@ func (p *TGetResultSetMetadataResp) Validate() error {
 //  - OperationHandle
 //  - Orientation
 //  - MaxRows
+//  - FetchType
 // 
 type TFetchResultsReq struct {
 	OperationHandle *TOperationHandle `thrift:"operationHandle,1,required" db:"operationHandle" json:"operationHandle"`
 	Orientation TFetchOrientation `thrift:"orientation,2,required" db:"orientation" json:"orientation"`
 	MaxRows int64 `thrift:"maxRows,3,required" db:"maxRows" json:"maxRows"`
+	FetchType int16 `thrift:"fetchType,4" db:"fetchType" json:"fetchType"`
 }
 
 func NewTFetchResultsReq() *TFetchResultsReq {
@@ -14885,8 +14944,19 @@ func (p *TFetchResultsReq) GetMaxRows() int64 {
 	return p.MaxRows
 }
 
+var TFetchResultsReq_FetchType_DEFAULT int16 = 0
+
+
+func (p *TFetchResultsReq) GetFetchType() int16 {
+	return p.FetchType
+}
+
 func (p *TFetchResultsReq) IsSetOperationHandle() bool {
 	return p.OperationHandle != nil
+}
+
+func (p *TFetchResultsReq) IsSetFetchType() bool {
+	return p.FetchType != TFetchResultsReq_FetchType_DEFAULT
 }
 
 func (p *TFetchResultsReq) Read(ctx context.Context, iprot thrift.TProtocol) error {
@@ -14935,6 +15005,16 @@ func (p *TFetchResultsReq) Read(ctx context.Context, iprot thrift.TProtocol) err
 					return err
 				}
 				issetMaxRows = true
+			} else {
+				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+					return err
+				}
+			}
+		case 4:
+			if fieldTypeId == thrift.I16 {
+				if err := p.ReadField4(ctx, iprot); err != nil {
+					return err
+				}
 			} else {
 				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
 					return err
@@ -14991,6 +15071,15 @@ func (p *TFetchResultsReq) ReadField3(ctx context.Context, iprot thrift.TProtoco
 	return nil
 }
 
+func (p *TFetchResultsReq) ReadField4(ctx context.Context, iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadI16(ctx); err != nil {
+		return thrift.PrependError("error reading field 4: ", err)
+	} else {
+		p.FetchType = v
+	}
+	return nil
+}
+
 func (p *TFetchResultsReq) Write(ctx context.Context, oprot thrift.TProtocol) error {
 	if err := oprot.WriteStructBegin(ctx, "TFetchResultsReq"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
@@ -14999,6 +15088,7 @@ func (p *TFetchResultsReq) Write(ctx context.Context, oprot thrift.TProtocol) er
 		if err := p.writeField1(ctx, oprot); err != nil { return err }
 		if err := p.writeField2(ctx, oprot); err != nil { return err }
 		if err := p.writeField3(ctx, oprot); err != nil { return err }
+		if err := p.writeField4(ctx, oprot); err != nil { return err }
 	}
 	if err := oprot.WriteFieldStop(ctx); err != nil {
 		return thrift.PrependError("write field stop error: ", err)
@@ -15048,6 +15138,21 @@ func (p *TFetchResultsReq) writeField3(ctx context.Context, oprot thrift.TProtoc
 	return err
 }
 
+func (p *TFetchResultsReq) writeField4(ctx context.Context, oprot thrift.TProtocol) (err error) {
+	if p.IsSetFetchType() {
+		if err := oprot.WriteFieldBegin(ctx, "fetchType", thrift.I16, 4); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T write field begin error 4:fetchType: ", p), err)
+		}
+		if err := oprot.WriteI16(ctx, int16(p.FetchType)); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T.fetchType (4) field write error: ", p), err)
+		}
+		if err := oprot.WriteFieldEnd(ctx); err != nil {
+			return thrift.PrependError(fmt.Sprintf("%T write field end error 4:fetchType: ", p), err)
+		}
+	}
+	return err
+}
+
 func (p *TFetchResultsReq) Equals(other *TFetchResultsReq) bool {
 	if p == other {
 		return true
@@ -15057,6 +15162,7 @@ func (p *TFetchResultsReq) Equals(other *TFetchResultsReq) bool {
 	if !p.OperationHandle.Equals(other.OperationHandle) { return false }
 	if p.Orientation != other.Orientation { return false }
 	if p.MaxRows != other.MaxRows { return false }
+	if p.FetchType != other.FetchType { return false }
 	return true
 }
 

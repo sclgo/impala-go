@@ -5,7 +5,6 @@ package status
 import (
 	"bytes"
 	"context"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +12,8 @@ import (
 	thrift "github.com/apache/thrift/lib/go/thrift"
 	"strings"
 	"regexp"
+	"github.com/sclgo/impala-go/internal/generated/errorcodes"
+
 )
 
 // (needed to ensure safety because of naive import list construction.)
@@ -27,81 +28,13 @@ var _ = thrift.ZERO
 var _ = strings.Contains
 var _ = regexp.MatchString
 
-type TStatusCode int64
-const (
-	TStatusCode_OK TStatusCode = 0
-	TStatusCode_CANCELLED TStatusCode = 1
-	TStatusCode_ANALYSIS_ERROR TStatusCode = 2
-	TStatusCode_NOT_IMPLEMENTED_ERROR TStatusCode = 3
-	TStatusCode_RUNTIME_ERROR TStatusCode = 4
-	TStatusCode_MEM_LIMIT_EXCEEDED TStatusCode = 5
-	TStatusCode_INTERNAL_ERROR TStatusCode = 6
-)
-
-func (p TStatusCode) String() string {
-	switch p {
-	case TStatusCode_OK: return "OK"
-	case TStatusCode_CANCELLED: return "CANCELLED"
-	case TStatusCode_ANALYSIS_ERROR: return "ANALYSIS_ERROR"
-	case TStatusCode_NOT_IMPLEMENTED_ERROR: return "NOT_IMPLEMENTED_ERROR"
-	case TStatusCode_RUNTIME_ERROR: return "RUNTIME_ERROR"
-	case TStatusCode_MEM_LIMIT_EXCEEDED: return "MEM_LIMIT_EXCEEDED"
-	case TStatusCode_INTERNAL_ERROR: return "INTERNAL_ERROR"
-	}
-	return "<UNSET>"
-}
-
-func TStatusCodeFromString(s string) (TStatusCode, error) {
-	switch s {
-	case "OK": return TStatusCode_OK, nil
-	case "CANCELLED": return TStatusCode_CANCELLED, nil
-	case "ANALYSIS_ERROR": return TStatusCode_ANALYSIS_ERROR, nil
-	case "NOT_IMPLEMENTED_ERROR": return TStatusCode_NOT_IMPLEMENTED_ERROR, nil
-	case "RUNTIME_ERROR": return TStatusCode_RUNTIME_ERROR, nil
-	case "MEM_LIMIT_EXCEEDED": return TStatusCode_MEM_LIMIT_EXCEEDED, nil
-	case "INTERNAL_ERROR": return TStatusCode_INTERNAL_ERROR, nil
-	}
-	return TStatusCode(0), fmt.Errorf("not a valid TStatusCode string")
-}
-
-
-func TStatusCodePtr(v TStatusCode) *TStatusCode { return &v }
-
-func (p TStatusCode) MarshalText() ([]byte, error) {
-	return []byte(p.String()), nil
-}
-
-func (p *TStatusCode) UnmarshalText(text []byte) error {
-	q, err := TStatusCodeFromString(string(text))
-	if err != nil {
-		return err
-	}
-	*p = q
-	return nil
-}
-
-func (p *TStatusCode) Scan(value interface{}) error {
-	v, ok := value.(int64)
-	if !ok {
-		return errors.New("Scan value is not int64")
-	}
-	*p = TStatusCode(v)
-	return nil
-}
-
-func (p *TStatusCode) Value() (driver.Value, error) {
-	if p == nil {
-		return nil, nil
-	}
-	return int64(*p), nil
-}
-
+var _ = errorcodes.GoUnusedProtection__
 // Attributes:
 //  - StatusCode
 //  - ErrorMsgs
 // 
 type TStatus struct {
-	StatusCode TStatusCode `thrift:"status_code,1,required" db:"status_code" json:"status_code"`
+	StatusCode errorcodes.TErrorCode `thrift:"status_code,1,required" db:"status_code" json:"status_code"`
 	ErrorMsgs []string `thrift:"error_msgs,2" db:"error_msgs" json:"error_msgs"`
 }
 
@@ -111,7 +44,7 @@ func NewTStatus() *TStatus {
 
 
 
-func (p *TStatus) GetStatusCode() TStatusCode {
+func (p *TStatus) GetStatusCode() errorcodes.TErrorCode {
 	return p.StatusCode
 }
 
@@ -180,7 +113,7 @@ func (p *TStatus) ReadField1(ctx context.Context, iprot thrift.TProtocol) error 
 	if v, err := iprot.ReadI32(ctx); err != nil {
 		return thrift.PrependError("error reading field 1: ", err)
 	} else {
-		temp := TStatusCode(v)
+		temp := errorcodes.TErrorCode(v)
 		p.StatusCode = temp
 	}
 	return nil

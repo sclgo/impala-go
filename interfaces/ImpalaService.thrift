@@ -1,147 +1,133 @@
-// Copyright 2012 Cloudera Inc.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-include "Status.thrift"
-include "beeswax.thrift"
+include "ExecStats.thrift"
 include "cli_service.thrift"
 
-// ImpalaService accepts query execution options through beeswax.Query.configuration in
-// key:value form. For example, the list of strings could be:
-//     "num_nodes:1", "abort_on_error:false"
-// The valid keys are listed in this enum. They map to TQueryOptions.
-// Note: If you add an option or change the default, you also need to update:
-// - ImpalaService.DEFAULT_QUERY_OPTIONS
-// - ImpalaInternalService.thrift: TQueryOptions
-// - ImpaladClientExecutor.getBeeswaxQueryConfigurations()
-// - ImpalaServer::SetQueryOptions()
-// - ImpalaServer::TQueryOptionsToMap()
-enum TImpalaQueryOptions {
-  // if true, abort execution on the first error
-  ABORT_ON_ERROR,
-  
-  // maximum # of errors to be reported; Unspecified or 0 indicates backend default
-  MAX_ERRORS,
-  
-  // if true, disable llvm codegen
-  DISABLE_CODEGEN,
-  
-  // batch size to be used by backend; Unspecified or a size of 0 indicates backend
-  // default
-  BATCH_SIZE,
+// The summary of a DML statement.
+struct TDmlResult {
+  // Number of modified rows per partition. Only applies to HDFS and Kudu tables.
+  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with
+  // the root in an unpartitioned table being the empty string.
+  1: required map<string, i64> rows_modified
+  3: optional map<string, i64> rows_deleted
 
-  // a per-machine approximate limit on the memory consumption of this query;
-  // unspecified or a limit of 0 means no limit;
-  // otherwise specified either as:
-  // a) an int (= number of bytes);
-  // b) a float followed by "M" (MB) or "G" (GB)
-  MEM_LIMIT,
-   
-  // specifies the degree of parallelism with which to execute the query;
-  // 1: single-node execution
-  // NUM_NODES_ALL: executes on all nodes that contain relevant data
-  // NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
-  // > 1: executes on at most that many nodes at any point in time (ie, there can be
-  //      more nodes than numNodes with plan fragments for this query, but at most
-  //      numNodes would be active at any point in time)
-  // Constants (NUM_NODES_ALL, NUM_NODES_ALL_RACKS) are defined in JavaConstants.thrift.
-  NUM_NODES,
-  
-  // maximum length of the scan range; only applicable to HDFS scan range; Unspecified or
-  // a length of 0 indicates backend default;  
-  MAX_SCAN_RANGE_LENGTH,
-  
-  // Maximum number of io buffers (per disk)
-  MAX_IO_BUFFERS,
-
-  // Number of scanner threads.
-  NUM_SCANNER_THREADS,
-
-  // If true, Impala will try to execute on file formats that are not fully supported yet
-  ALLOW_UNSUPPORTED_FORMATS,
-
-  // if set and > -1, specifies the default limit applied to a top-level SELECT statement
-  // with an ORDER BY but without a LIMIT clause (ie, if the SELECT statement also has
-  // a LIMIT clause, this default is ignored)
-  DEFAULT_ORDER_BY_LIMIT,
-
-  // DEBUG ONLY:
-  // If set to
-  //   "[<backend number>:]<node id>:<TExecNodePhase>:<TDebugAction>",
-  // the exec node with the given id will perform the specified action in the given
-  // phase. If the optional backend number (starting from 0) is specified, only that
-  // backend instance will perform the debug action, otherwise all backends will behave
-  // in that way.
-  // If the string doesn't have the required format or if any of its components is
-  // invalid, the option is ignored. 
-  DEBUG_ACTION,
+  // Number of row operations attempted but not completed due to non-fatal errors
+  // reported by the storage engine that Impala treats as warnings. Only applies to Kudu
+  // tables. This includes errors due to duplicate/missing primary keys, nullability
+  // constraint violations, and primary keys in uncovered partition ranges.
+  // TODO: Provide a detailed breakdown of these counts by error. IMPALA-4416.
+  2: optional i64 num_row_errors
 }
 
-// Default values for each query option in ImpalaService.TImpalaQueryOptions
-const map<TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
-  TImpalaQueryOptions.ABORT_ON_ERROR : "false",
-  TImpalaQueryOptions.MAX_ERRORS : "0",
-  TImpalaQueryOptions.DISABLE_CODEGEN : "false",
-  TImpalaQueryOptions.BATCH_SIZE : "0",
-  TImpalaQueryOptions.NUM_NODES : "0",
-  TImpalaQueryOptions.MAX_SCAN_RANGE_LENGTH : "0",
-  TImpalaQueryOptions.MAX_IO_BUFFERS : "0"
-  TImpalaQueryOptions.NUM_SCANNER_THREADS : "0"
-  TImpalaQueryOptions.ALLOW_UNSUPPORTED_FORMATS : "false"
-  TImpalaQueryOptions.DEFAULT_ORDER_BY_LIMIT : "-1"
-  TImpalaQueryOptions.DEBUG_ACTION : ""
-  TImpalaQueryOptions.MEM_LIMIT : "0"
+// Response from a call to PingImpalaService
+struct TPingImpalaServiceResp {
+  // The Impala service's version string.
+  1: string version
+
+  // The Impalad's webserver address.
+  2: string webserver_address
 }
 
-// The summary of an insert.
-struct TInsertResult {  
-  // Number of appended rows per modified partition. Only applies to HDFS tables.
-  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the 
-  // root in an unpartitioned table being the empty string.
-  1: required map<string, i64> rows_appended
+// Parameters for a ResetTable request which will invalidate a table's metadata.
+// DEPRECATED.
+struct TResetTableReq {
+  // Name of the table's parent database.
+  1: required string db_name
+
+  // Name of the table.
+  2: required string table_name
 }
 
-// For all rpc that return a TStatus as part of their result type,
-// if the status_code field is set to anything other than OK, the contents
-// of the remainder of the result type is undefined (typically not set)
-service ImpalaService extends beeswax.BeeswaxService {
-  // Cancel execution of query. Returns RUNTIME_ERROR if query_id
-  // unknown.
-  // This terminates all threads running on behalf of this query at
-  // all nodes that were involved in the execution.
-  // Throws BeeswaxException if the query handle is invalid (this doesn't
-  // necessarily indicate an error: the query might have finished).
-  Status.TStatus Cancel(1:beeswax.QueryHandle query_id)
-      throws(1:beeswax.BeeswaxException error);
-        
-  // Invalidates all catalog metadata, forcing a reload
-  // TODO(koblas) -- commented out since golang dies --
-  //    Status.TStatus ResetCatalog();
-  
-  // Closes the query handle and return the result summary of the insert.
-  TInsertResult CloseInsert(1:beeswax.QueryHandle handle)
-      throws(1:beeswax.QueryNotFoundException error, 2:beeswax.BeeswaxException error2);
-      
-  // Client calls this RPC to verify that the server is an ImpalaService.
-  void PingImpalaService();
+// PingImpalaHS2Service() - ImpalaHiveServer2Service version.
+// Pings the Impala server to confirm that the server is alive and the session identified
+// by 'sessionHandle' is open. Returns metadata about the server. This exists separate
+// from the base HS2 GetInfo() methods because not all relevant metadata is accessible
+// through GetInfo().
+struct TPingImpalaHS2ServiceReq {
+  1: required cli_service.TSessionHandle sessionHandle
+}
+
+struct TPingImpalaHS2ServiceResp {
+  1: required cli_service.TStatus status
+
+  // The Impala service's version string.
+  2: optional string version
+
+  // The Impalad's webserver address.
+  3: optional string webserver_address
+
+  // The Impalad's local monotonic time
+  4: optional i64 timestamp
+}
+
+// CloseImpalaOperation()
+//
+// Extended version of CloseOperation() that, if the operation was a DML
+// operation, returns statistics about the operation.
+struct TCloseImpalaOperationReq {
+  1: required cli_service.TOperationHandle operationHandle
+}
+
+struct TCloseImpalaOperationResp {
+  1: required cli_service.TStatus status
+
+  // Populated if the operation was a DML operation.
+  2: optional TDmlResult dml_result
 }
 
 // Impala HiveServer2 service
-service ImpalaHiveServer2Service extends cli_service.TCLIService {
-  // Invalidates all catalog metadata, forcing a reload
-  Status.TStatus ResetCatalog(); 
+
+struct TGetExecSummaryReq {
+  1: optional cli_service.TOperationHandle operationHandle
+
+  2: optional cli_service.TSessionHandle sessionHandle
+
+  // If true, returns the summaries of all query attempts. A TGetExecSummaryResp
+  // always returns the profile for the most recent query attempt, regardless of the
+  // query id specified. Clients should set this to true if they want to retrieve the
+  // summaries of all query attempts (including the failed ones).
+  3: optional bool include_query_attempts = false
 }
 
+struct TGetExecSummaryResp {
+  1: required cli_service.TStatus status
+
+  2: optional ExecStats.TExecSummary summary
+
+  // A list of all summaries of the failed query attempts.
+  3: optional list<ExecStats.TExecSummary> failed_summaries
+}
+
+
+service ImpalaHiveServer2Service extends cli_service.TCLIService {
+  // Returns the exec summary for the given query. The exec summary is only valid for
+  // queries that execute with Impala's backend, i.e. QUERY, DML and COMPUTE_STATS
+  // queries. Otherwise a default-initialized TExecSummary is returned for
+  // backwards-compatibility with impala-shell - see IMPALA-9729.
+  TGetExecSummaryResp GetExecSummary(1:TGetExecSummaryReq req);
+
+  // Client calls this RPC to verify that the server is an ImpalaService. Returns the
+  // server version.
+  TPingImpalaHS2ServiceResp PingImpalaHS2Service(1:TPingImpalaHS2ServiceReq req);
+
+  // Same as HS2 CloseOperation but can return additional information.
+  TCloseImpalaOperationResp CloseImpalaOperation(1:TCloseImpalaOperationReq req);
+}

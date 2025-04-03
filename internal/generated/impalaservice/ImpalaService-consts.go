@@ -12,8 +12,7 @@ import (
 	thrift "github.com/apache/thrift/lib/go/thrift"
 	"strings"
 	"regexp"
-	"github.com/sclgo/impala-go/internal/generated/status"
-	"github.com/sclgo/impala-go/internal/generated/beeswax"
+	"github.com/sclgo/impala-go/internal/generated/execstats"
 	"github.com/sclgo/impala-go/internal/generated/cli_service"
 
 )
@@ -30,26 +29,9 @@ var _ = thrift.ZERO
 var _ = strings.Contains
 var _ = regexp.MatchString
 
-var _ = status.GoUnusedProtection__
-var _ = beeswax.GoUnusedProtection__
+var _ = execstats.GoUnusedProtection__
 var _ = cli_service.GoUnusedProtection__
-var DEFAULT_QUERY_OPTIONS map[TImpalaQueryOptions]string
 
 func init() {
-DEFAULT_QUERY_OPTIONS = map[TImpalaQueryOptions]string{
-	0: "false",
-	9: "false",
-	3: "0",
-	11: "",
-	10: "-1",
-	2: "false",
-	1: "0",
-	7: "0",
-	6: "0",
-	4: "0",
-	5: "0",
-	8: "0",
-}
-
 }
 

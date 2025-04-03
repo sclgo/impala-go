@@ -12,6 +12,8 @@ import (
 	thrift "github.com/apache/thrift/lib/go/thrift"
 	"strings"
 	"regexp"
+	"github.com/sclgo/impala-go/internal/generated/errorcodes"
+
 )
 
 // (needed to ensure safety because of naive import list construction.)
@@ -26,6 +28,7 @@ var _ = thrift.ZERO
 var _ = strings.Contains
 var _ = regexp.MatchString
 
+var _ = errorcodes.GoUnusedProtection__
 
 func init() {
 }
