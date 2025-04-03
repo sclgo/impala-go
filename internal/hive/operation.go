@@ -168,7 +168,7 @@ func nextDuration(duration time.Duration) time.Duration {
 	return duration
 }
 
-// Close closes operation
+// Close closes operation and returns rows affected if any
 func (op *Operation) Close(ctx context.Context) (int64, error) {
 	req := impalaservice.TCloseImpalaOperationReq{
 		OperationHandle: op.h,
