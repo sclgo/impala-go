@@ -19,6 +19,12 @@ type TableName struct {
 	Type   string
 }
 
+type ColumnName struct {
+	Schema     string
+	TableName  string
+	ColumnName string
+}
+
 // DBMetadata exposes the database schema. It does not own the underlying client and session
 // so they must be open while the objects and the data iterators are used.
 type DBMetadata struct {
@@ -37,6 +43,36 @@ var tableResultSchema = &TableSchema{
 		stringColumn,
 		stringColumn,
 	},
+}
+
+func (m DBMetadata) GetColumnsSeq(ctx context.Context, schemaPattern string, tableNamePattern string, columnNamePattern string) (iter.Seq[ColumnName], *error) {
+	req := cli_service.TGetColumnsReq{
+		SessionHandle: m.h,
+		SchemaName:    lo.ToPtr(cli_service.TPatternOrIdentifier(schemaPattern)),
+		TableName:     lo.ToPtr(cli_service.TPatternOrIdentifier(tableNamePattern)),
+		ColumnName:    lo.ToPtr(cli_service.TPatternOrIdentifier(columnNamePattern)),
+	}
+
+	resp, err := m.hive.client.GetColumns(ctx, &req)
+	if err != nil {
+		return nil, &err
+	}
+	if err = checkStatus(resp); err != nil {
+		return nil, &err
+	}
+	op := &Operation{
+		h:    resp.OperationHandle,
+		hive: m.hive,
+	}
+
+	rs, err := op.FetchResults(ctx, tableResultSchema)
+	if err != nil {
+		return nil, &err
+	}
+
+	return func(yield func(name ColumnName) bool) {
+		err = read(ctx, op, rs, 4, readColumn, yield)
+	}, &err
 }
 
 // GetTablesSeq returns tables and views that match the criteria as an iterator. Patterns use LIKE syntax
@@ -128,6 +164,15 @@ func readTable(row []driver.Value) TableName {
 		Schema: fmt.Sprintf("%v", row[1]),
 		Name:   fmt.Sprintf("%v", row[2]),
 		Type:   fmt.Sprintf("%v", row[3]),
+	}
+}
+
+func readColumn(row []driver.Value) ColumnName {
+	return ColumnName{
+		Schema:     fmt.Sprintf("%v", row[1]),
+		TableName:  fmt.Sprintf("%v", row[2]),
+		ColumnName: fmt.Sprintf("%v", row[3]),
+		// There is no column 4
 	}
 }
 

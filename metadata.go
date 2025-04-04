@@ -25,6 +25,9 @@ type ConnRawAccess interface {
 // TableName contains all attributes that identify a table
 type TableName = hive.TableName
 
+// ColumnName contains all attributes that identify a columns
+type ColumnName = hive.ColumnName
+
 // It is questionable if it is appropriate to have a type alias to internal package
 // in a public package. Will change if it becomes an issue.
 
@@ -38,6 +41,13 @@ func NewMetadata(db *sql.DB) *Metadata {
 // *sql.Conn implements ConnRawAccess
 func NewMetadataFromConn(conn ConnRawAccess) *Metadata {
 	return &Metadata{conn: conn}
+}
+
+// GetColumns retrieves columns that match the provided LIKE patterns
+func (m Metadata) GetColumns(ctx context.Context, schemaPattern string, tableNamePattern string, columnNamePattern string) ([]ColumnName, error) {
+	return raw(ctx, m.db, m.conn, func(dbm hive.DBMetadata) (iter.Seq[hive.ColumnName], *error) {
+		return dbm.GetColumnsSeq(ctx, schemaPattern, tableNamePattern, columnNamePattern)
+	})
 }
 
 // GetTables retrieves tables and views that match the provided LIKE patterns

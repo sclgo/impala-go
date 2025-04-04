@@ -343,7 +343,13 @@ func testMetadata(t *testing.T, conn *sql.DB) {
 		require.NoError(t, err)
 		require.Contains(t, res, "default")
 	})
-
+	t.Run("Columns", func(t *testing.T) {
+		res, err := m.GetColumns(context.Background(), "defaul%", "tes%", "%")
+		require.NoError(t, err)
+		require.True(t, slices.ContainsFunc(res, func(tbl impala.ColumnName) bool {
+			return tbl.TableName == "test" && tbl.Schema == "default" && tbl.ColumnName == "a"
+		}))
+	})
 }
 
 func testInsert(t *testing.T, conn *sql.DB) {
