@@ -83,13 +83,13 @@ func (t *TSaslTransport) Open() error {
 return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 	}
 	if err := t.negotiationSend(StatusOK, initial); err != nil {
-		return fmt.Errorf("sasl: negotiation failed. %w", err)
+return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 	}
 
 	for {
 		status, challenge, err := t.receive()
 		if err != nil {
-			return fmt.Errorf("sasl: negotiation failed. %w", err)
+return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 		}
 
 		if status != StatusOK && status != StatusComplete {
@@ -102,10 +102,10 @@ return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 
 		payload, _, err := t.sasl.Step(challenge)
 		if err != nil {
-			return fmt.Errorf("sasl: negotiation failed. %w", err)
+return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 		}
 		if err := t.negotiationSend(StatusOK, payload); err != nil {
-			return fmt.Errorf("sasl: negotiation failed. %w", err)
+return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 		}
 
 	}
