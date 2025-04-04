@@ -11,24 +11,24 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
-type UserPassAuthError struct {
+type AuthError struct {
 	username       string
 	transportError error
 }
 
 // Error implements error
-func (e *UserPassAuthError) Error() string {
+func (e *AuthError) Error() string {
 	// message does not start with "impala: " because this error is expected to be wrapped
 	// in a chain, reflecting the process during which the auth. error occurred.
 	return fmt.Sprintf("authentication failed for user %s", e.username)
 }
 
 // Unwrap implements support for error.Is / As
-func (e *UserPassAuthError) Unwrap() error {
+func (e *AuthError) Unwrap() error {
 	return e.transportError
 }
 
-var _ error = (*UserPassAuthError)(nil)
+var _ error = (*AuthError)(nil)
 
 type TSaslTransport struct {
 	rbuf *bytes.Buffer

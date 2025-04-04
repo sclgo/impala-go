@@ -18,7 +18,7 @@ func (m *plain) Step(_ []byte) ([]byte, bool, error) {
 }
 
 func (m *plain) InterpretReceiveEOF(transportError error) error {
-	return &UserPassAuthError{
+	return &AuthError{
 		username:       m.opts.Username,
 		transportError: transportError,
 	}
