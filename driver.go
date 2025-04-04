@@ -21,10 +21,21 @@ import (
 	"github.com/sclgo/impala-go/internal/sasl"
 )
 
+// Sentinel errors that don't carry instance information
+
 var (
 	// ErrNotSupported means this operation is not supported by impala driver
 	ErrNotSupported = isql.ErrNotSupported
 )
+
+// The following errors carry instance information so they are types, instead of sentinel values.
+
+// UserPassAuthError indicates that the provided username and password combination is not correct.
+// The error message documents the username that was used. errors.Unwrap() returns
+// the underlying error that was interpreted as auth. failure.
+// This error will not be top-level in the chain - earlier errors in the chain
+// reflect the process during which the auth. error happened.
+type UserPassAuthError = sasl.UserPassAuthError
 
 const (
 	badDSNErrorPrefix = "impala: bad DSN: "

@@ -244,6 +244,17 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 		expectedErrorType := &tls.CertificateVerificationError{}
 		require.ErrorAs(t, err, &expectedErrorType)
 	})
+
+	t.Run("bad password", func(t *testing.T) {
+		badPassDsn, err := url.Parse(dsn)
+		require.NoError(t, err)
+		badPassDsn.User = url.UserPassword("wrong", "password")
+		builtInCertsDb := fi.NoError(sql.Open("impala", badPassDsn.String())).Require(t)
+		defer fi.NoErrorF(builtInCertsDb.Close, t)
+		err = builtInCertsDb.Ping()
+		expectedErrorType := &impala.UserPassAuthError{}
+		require.ErrorAs(t, err, &expectedErrorType)
+	})
 }
 
 func startImpala3(t *testing.T) string {

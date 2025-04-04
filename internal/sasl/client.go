@@ -29,11 +29,16 @@ func (c *client) Step(challenge []byte) ([]byte, bool, error) {
 	return c.m.Step(challenge)
 }
 
+func (c *client) InterpretReceiveEOF(transportError error) error {
+	return c.m.InterpretReceiveEOF(transportError)
+}
+
 func (c *client) Free() {}
 
 type mech interface {
 	Start() (mech string, initial []byte, done bool, err error)
 	Step(challenge []byte) (response []byte, done bool, err error)
+	InterpretReceiveEOF(transportError error) error
 }
 
 type client struct {

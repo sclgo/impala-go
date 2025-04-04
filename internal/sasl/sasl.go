@@ -1,6 +1,8 @@
 package sasl
 
-import "errors"
+import (
+	"errors"
+)
 
 // Common SASL errors.
 var (
@@ -29,4 +31,5 @@ type Client interface {
 	Start(mechlist []string) (mech string, initial []byte, done bool, err error)
 	Step(challenge []byte) (response []byte, done bool, err error)
 	Free()
+	InterpretReceiveEOF(transportError error) error
 }

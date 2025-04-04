@@ -16,3 +16,10 @@ func (m *plain) Start() (string, []byte, bool, error) {
 func (m *plain) Step(_ []byte) ([]byte, bool, error) {
 	return nil, false, ErrUnexpectedServerChallenge
 }
+
+func (m *plain) InterpretReceiveEOF(transportError error) error {
+	return &UserPassAuthError{
+		username:       m.opts.Username,
+		transportError: transportError,
+	}
+}
