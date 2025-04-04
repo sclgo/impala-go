@@ -80,7 +80,7 @@ func (t *TSaslTransport) Open() error {
 	}
 
 	if err := t.negotiationSend(StatusStart, []byte(mech)); err != nil {
-		return fmt.Errorf("sasl: negotiation failed. %w", err)
+return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 	}
 	if err := t.negotiationSend(StatusOK, initial); err != nil {
 		return fmt.Errorf("sasl: negotiation failed. %w", err)
