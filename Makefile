@@ -7,8 +7,8 @@ thrift:
 .PHONY: cli
 cli: usql
 
-usql:
-	go run github.com/sclgo/usqlgen@v0.1.1 -v build --import github.com/sclgo/impala-go
+usql: Makefile
+	go run github.com/sclgo/usqlgen@v0.3.0 -v build --get github.com/sclgo/impala-go@$(shell git branch --show-current || echo master) -- -tags impala
 
 short-test:
 	go test -short -v ./...

@@ -31,3 +31,4 @@ enumerateDB
 compose/notebooks/.ipynb_checkpoints/
 compose/jupyter_conf/lab
 compose/jupyter_conf/serverconfig/
+/usql
