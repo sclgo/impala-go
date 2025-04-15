@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/murfffi/gorich/helperr"
 	"github.com/sclgo/impala-go/internal/hive"
-	"github.com/sclgo/impala-go/internal/sclerr"
 )
 
 var (
@@ -40,7 +40,7 @@ func (c *Conn) Ping(ctx context.Context) error {
 	// Looking at go stdlib code, it seems that both "broken pipe" and "reset" are not
 	// specific error instances, so they can be checked only by message.
 	// Possibly, the reason is that those messages come from the OS.
-	if sclerr.ContainsAny(err, "broken pipe", "connection reset by peer") {
+	if helperr.ContainsAny(err, "broken pipe", "connection reset by peer") {
 		err = fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
 	}
 	// There can be other similar cases, but driver.ErrBadConn and Ping specs require us

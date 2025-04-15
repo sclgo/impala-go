@@ -25,11 +25,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/go-units"
+	"github.com/murfffi/gorich/fi"
+	"github.com/murfffi/gorich/helperr"
+	"github.com/murfffi/gorich/lang"
 	"github.com/samber/lo"
 	"github.com/sclgo/impala-go"
-	"github.com/sclgo/impala-go/internal/fi"
 	"github.com/sclgo/impala-go/internal/hive"
-	"github.com/sclgo/impala-go/internal/sclerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -96,12 +97,12 @@ func TestIntegration_Restart(t *testing.T) {
 	})
 
 	db := fi.NoError(sql.Open("impala", dsn)).Require(t)
-	defer sclerr.CloseQuietly(db)
+	defer helperr.CloseQuietly(db)
 
 	conn, err := db.Conn(ctx)
 	require.NoError(t, err)
 
-	defer sclerr.CloseQuietly(conn)
+	defer helperr.CloseQuietly(conn)
 
 	err = conn.PingContext(ctx)
 	require.NoError(t, err)
@@ -434,7 +435,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		NetworkRequest: netReq,
 	})
 	require.NoError(t, err)
-	fi.CleanupF(t, fi.Bind(containerNet.Remove, context.Background()))
+	fi.CleanupF(t, lang.Bind(containerNet.Remove, context.Background()))
 
 	docker, err := testcontainers.NewDockerClientWithOpts(ctx)
 	require.NoError(t, err)
