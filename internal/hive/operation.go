@@ -78,18 +78,6 @@ func (op *Operation) GetResultSetMetadata(ctx context.Context) (*TableSchema, er
 	return schema, nil
 }
 
-func getPrecisionScale(qualifiers map[string]*cli_service.TTypeQualifierValue) (int64, int64, bool) {
-	precisionQ, _ := qualifiers["precision"]
-	if precisionQ == nil {
-		return 0, 0, false
-	}
-	scaleQ, _ := qualifiers["scale"]
-	if scaleQ == nil {
-		return 0, 0, false
-	}
-	return int64(precisionQ.GetI32Value()), int64(scaleQ.GetI32Value()), true
-}
-
 // FetchResults fetches query result from server
 func (op *Operation) FetchResults(ctx context.Context, schema *TableSchema) (*ResultSet, error) {
 
@@ -230,9 +218,21 @@ func sleep(ctx context.Context, d time.Duration) {
 }
 
 func getMaxLength(typeQualifiers map[string]*cli_service.TTypeQualifierValue) (int64, bool) {
-	lengthQualifier, _ := typeQualifiers["characterMaximumLength"]
+	lengthQualifier := typeQualifiers["characterMaximumLength"]
 	if lengthQualifier == nil {
 		return 0, false
 	}
 	return int64(lengthQualifier.GetI32Value()), true
+}
+
+func getPrecisionScale(qualifiers map[string]*cli_service.TTypeQualifierValue) (int64, int64, bool) {
+	precisionQ := qualifiers["precision"]
+	if precisionQ == nil {
+		return 0, 0, false
+	}
+	scaleQ := qualifiers["scale"]
+	if scaleQ == nil {
+		return 0, 0, false
+	}
+	return int64(precisionQ.GetI32Value()), int64(scaleQ.GetI32Value()), true
 }
