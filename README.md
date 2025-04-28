@@ -159,6 +159,21 @@ func main() {
 
 Check out also [an open data end-to-end demo](compose/README.md).
 
+## Data types
+
+[Impala data types](https://impala.apache.org/docs/build/html/topics/impala_datatypes.html)
+are mapped to Go types as expected, with the following exceptions:
+
+* Complex types - MAP, STRUCT, ARRAY - are not supported. Impala itself has limited support for those.
+  As a workaround, select individual fields or flatten such values within select statements.
+* Decimals are converted to strings
+  by [the Impala server API](https://github.com/apache/impala/blob/c5a0ec8/common/thrift/hive-1-api/TCLIService.thrift#L327).
+  Either parse the decimal value after `Row.Scan`,
+  or use a custom [sql.Scanner](https://pkg.go.dev/database/sql#Scanner) implementation
+  in `Row.Scan` e.g. `Decimal` from [github.com/cockroachdb/apd](https://github.com/cockroachdb/apd).
+  Note that the processing of `sql.Scanner` within `Row.Scan` is a feature of the `database/sql` package,
+  and not the driver. The `ScanType` of `DECIMAL` columns is `string`, while the ColumnTy
+
 ## Support
 
 The library is actively tested with Impala 4.4 and 3.4.

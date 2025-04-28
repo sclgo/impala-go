@@ -12,16 +12,22 @@ type TableSchema struct {
 	Columns []*ColDesc
 }
 
+// ColDesc mirrors sql.ColumnType struct which we can't just reuse because its fields are private
 type ColDesc struct {
 	Name string
 
 	DatabaseTypeName string
 	ScanType         reflect.Type
 
-	ColumnTypeNullable  bool
-	ColumnTypeLength    int64
-	ColumnTypePrecision int64
-	ColumnTypeScale     int64
+	// Impala columns are always Nullable, except some Kudu columns
+	NotNull bool
+
+	Length    int64
+	HasLength bool
+
+	Precision         int64
+	Scale             int64
+	HasPrecisionScale bool
 }
 
 var (
@@ -35,7 +41,7 @@ var (
 	dataTypeString   = reflect.TypeOf("")
 	dataTypeDateTime = reflect.TypeOf(time.Time{})
 	dataTypeRawBytes = reflect.TypeOf(sql.RawBytes{})
-	dataTypeUnknown  = reflect.TypeOf(new(interface{}))
+	dataTypeUnknown  = reflect.TypeFor[any]()
 )
 
 func typeOf(entry *cli_service.TPrimitiveTypeEntry) reflect.Type {
@@ -55,16 +61,13 @@ func typeOf(entry *cli_service.TPrimitiveTypeEntry) reflect.Type {
 		return dataTypeFloat64
 	case cli_service.TTypeId_NULL_TYPE:
 		return dataTypeNull
-	case cli_service.TTypeId_STRING_TYPE:
+	case cli_service.TTypeId_STRING_TYPE, cli_service.TTypeId_CHAR_TYPE, cli_service.TTypeId_VARCHAR_TYPE:
 		return dataTypeString
-	case cli_service.TTypeId_CHAR_TYPE:
-		return dataTypeString
-	case cli_service.TTypeId_VARCHAR_TYPE:
+	case cli_service.TTypeId_DECIMAL_TYPE: // see note in README
 		return dataTypeString
 	case cli_service.TTypeId_DATE_TYPE, cli_service.TTypeId_TIMESTAMP_TYPE:
 		return dataTypeDateTime
-	// TODO Support decimal Github #51
-	case cli_service.TTypeId_DECIMAL_TYPE, cli_service.TTypeId_BINARY_TYPE, cli_service.TTypeId_ARRAY_TYPE,
+	case cli_service.TTypeId_BINARY_TYPE, cli_service.TTypeId_ARRAY_TYPE,
 		cli_service.TTypeId_STRUCT_TYPE, cli_service.TTypeId_MAP_TYPE, cli_service.TTypeId_UNION_TYPE:
 		return dataTypeRawBytes
 	case cli_service.TTypeId_USER_DEFINED_TYPE:

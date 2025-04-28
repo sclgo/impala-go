@@ -146,8 +146,8 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 	t.Run("Pinger", func(t *testing.T) {
 		testPinger(t, db)
 	})
-	t.Run("Select", func(t *testing.T) {
-		testSelect(t, db)
+	t.Run("SelectOneIntoAny", func(t *testing.T) {
+		testSelectOneIntoAny(t, db)
 	})
 	t.Run("Metadata", func(t *testing.T) {
 		testMetadata(t, db)
@@ -291,13 +291,20 @@ func testPinger(t *testing.T, db *sql.DB) {
 	require.NoError(t, db.Ping())
 }
 
-func testSelect(t *testing.T, db *sql.DB) {
+type selectTestCase struct {
+	sql string
+	res interface{}
+
+	// The following are defined only for some tests
+	dbType           string
+	precision, scale *int64
+	length           *int64
+}
+
+func testSelectOneIntoAny(t *testing.T, db *sql.DB) {
 	sampletime, _ := time.Parse(time.RFC3339, "2019-01-01T12:00:00Z")
 
-	tests := []struct {
-		sql string
-		res interface{}
-	}{
+	tests := []selectTestCase{
 		{sql: "1", res: int8(1)},
 		{sql: "cast(1 as smallint)", res: int16(1)},
 		{sql: "cast(1 as int)", res: int32(1)},
@@ -306,6 +313,8 @@ func testSelect(t *testing.T, db *sql.DB) {
 		{sql: "cast(1.0 as double)", res: float64(1)},
 		{sql: "cast(1.0 as real)", res: float64(1)},
 		{sql: "'str'", res: "str"},
+		{sql: "cast(null as char(10))", res: nil, dbType: "CHAR", length: lo.ToPtr(int64(10))},
+		{sql: "cast(1.3 as decimal(10, 2))", res: "1.30", dbType: "DECIMAL", precision: lo.ToPtr(int64(10)), scale: lo.ToPtr(int64(2))},
 		{sql: "cast('str' as char(10))", res: "str       "},
 		{sql: "cast('str' as varchar(100))", res: "str"},
 		{sql: "cast('2019-01-01 12:00:00' as timestamp)", res: sampletime},
@@ -325,24 +334,50 @@ func testSelect(t *testing.T, db *sql.DB) {
 	for _, tt := range tests {
 		t.Run(tt.sql, func(t *testing.T) {
 			query := fmt.Sprintf("select %s", tt.sql)
-			row := conn.QueryRowContext(ctx, query)
-			err = row.Scan(&res)
+			dbRes, queryErr := conn.QueryContext(ctx, query)
+			require.NoError(t, queryErr)
+			defer fi.NoErrorF(dbRes.Close, t)
+			require.True(t, dbRes.Next())
+			err = dbRes.Scan(&res)
 			require.NoError(t, err)
-			require.NoError(t, row.Err())
-			expected := tt.res
-			require.Equal(t, expected, res)
+			require.Equal(t, tt.res, res)
 
-			checkScanType(ctx, t, conn, query, expected)
+			checkColumnType(t, dbRes, tt)
 		})
 	}
 }
 
-func checkScanType(ctx context.Context, t *testing.T, conn *sql.Conn, query string, expected any) {
-	dbRes := fi.NoError(conn.QueryContext(ctx, query)).Require(t)
-	defer fi.NoErrorF(dbRes.Close, t)
-	colTypes := fi.NoError(dbRes.ColumnTypes()).Require(t)
-	require.Equal(t, reflect.TypeOf(expected).String(), colTypes[0].ScanType().String())
-	require.Equal(t, reflect.TypeOf(expected), colTypes[0].ScanType())
+func checkColumnType(t *testing.T, dbRes *sql.Rows, tt selectTestCase) {
+	colType := fi.NoError(dbRes.ColumnTypes()).Require(t)[0]
+	expected := tt.res
+	if expected != nil {
+		// We compare the names first so we get a simpler message in case of a simple mismatch.
+		actualScanType := colType.ScanType()
+		require.Equal(t, reflect.TypeOf(expected).String(), actualScanType.String())
+		require.Equal(t, reflect.TypeOf(expected), actualScanType)
+	}
+
+	nullable, hasNullable := colType.Nullable()
+	require.True(t, hasNullable)
+	require.True(t, nullable)
+
+	if tt.dbType != "" {
+		require.Equal(t, tt.dbType, colType.DatabaseTypeName())
+	}
+
+	if tt.precision != nil && tt.scale != nil {
+		actualPrecision, actualScale, ok := colType.DecimalSize()
+		require.True(t, ok)
+		require.Equal(t, *tt.precision, actualPrecision)
+		require.Equal(t, *tt.scale, actualScale)
+	}
+
+	if tt.length != nil {
+		actualLength, ok := colType.Length()
+		require.True(t, ok)
+		require.Equal(t, *tt.length, actualLength)
+	}
+
 }
 
 func testMetadata(t *testing.T, conn *sql.DB) {
@@ -571,9 +606,9 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		},
 		ExposedPorts: []string{dbPort},
 		Name:         "impalad",
-		LogConsumerCfg: &testcontainers.LogConsumerConfig{
-			Consumers: []testcontainers.LogConsumer{&testcontainers.StdoutLogConsumer{}},
-		},
+		//LogConsumerCfg: &testcontainers.LogConsumerConfig{
+		//	Consumers: []testcontainers.LogConsumer{&testcontainers.StdoutLogConsumer{}},
+		//},
 	}
 	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,

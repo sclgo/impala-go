@@ -67,6 +67,9 @@ func parseURI(uri string) (*Options, error) {
 		return nil, err
 	}
 
+	// #21, https and http will be supported in the future for http transport
+	// transport=http(s) will also be supported for usql/dburl compatibility
+
 	if u.Scheme != "impala" {
 		return nil, fmt.Errorf("scheme %s not recognized", u.Scheme)
 	}
