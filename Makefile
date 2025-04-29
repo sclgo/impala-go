@@ -35,7 +35,12 @@ test:
 	go tool covdata textfmt -i=./coverage/covdata -o ./coverage/covprofile
 	go tool cover -html=./coverage/covprofile -o ./coverage/coverage.html
 
-checks: check_changes check_deps check_tidy
+#NB: CI uses the golangci-lint Github action, not this target
+.PHONY: lint
+lint:
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.5 run -v
+
+checks: check_changes check_deps check_tidy check_vuln
 
 check_changes:
 # make sure .next.version contains the intended next version
@@ -54,3 +59,7 @@ check_tidy:
 	go mod tidy
 	# Verify that `go mod tidy` didn't introduce any changes. Run go mod tidy before pushing.
 	git diff --exit-code --stat go.mod go.sum
+
+.PHONY: check_vuln
+check_vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
