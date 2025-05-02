@@ -23,7 +23,7 @@ Add `impala-go` to your Go module:
 go get github.com/sclgo/impala-go
 ```
 
-Alternatively, see below how to use as a CLI.
+Alternatively, see below how to use it as a CLI. `impala-go` does not use CGO.
 
 ## Connection Parameters and DSN
 
@@ -92,6 +92,8 @@ builds a `usql` binary in the working directory using `impala-go` from `master` 
 go run github.com/sclgo/usqlgen@latest build --get github.com/sclgo/impala-go@master -- -tags impala
 ```
 
+`usql` with `impala-go` is arguably a better CLI for Impala than the official impala-shell.
+For one, `usql` is much easier to install.
 
 ## Example Go code
 
@@ -164,23 +166,42 @@ Check out also [an open data end-to-end demo](compose/README.md).
 [Impala data types](https://impala.apache.org/docs/build/html/topics/impala_datatypes.html)
 are mapped to Go types as expected, with the following exceptions:
 
-* Complex types - MAP, STRUCT, ARRAY - are not supported. Impala itself has limited support for those.
+* "Complex" types - MAP, STRUCT, ARRAY - are not supported. Impala itself has limited support for those.
   As a workaround, select individual fields or flatten such values within select statements.
 * Decimals are converted to strings
   by [the Impala server API](https://github.com/apache/impala/blob/c5a0ec8/common/thrift/hive-1-api/TCLIService.thrift#L327).
-  Either parse the decimal value after `Row.Scan`,
+  Either parse the decimal value after `Rows.Scan`,
   or use a custom [sql.Scanner](https://pkg.go.dev/database/sql#Scanner) implementation
-  in `Row.Scan` e.g. `Decimal` from [github.com/cockroachdb/apd](https://github.com/cockroachdb/apd).
-  Note that the processing of `sql.Scanner` within `Row.Scan` is a feature of the `database/sql` package,
-  and not the driver. The `ScanType` of `DECIMAL` columns is `string`, while the ColumnTy
+  in `Row(s).Scan` e.g. `Decimal` from [github.com/cockroachdb/apd](https://github.com/cockroachdb/apd).
+  Note that the processing of `sql.Scanner` within `Row(s).Scan` is a feature of the `database/sql` package,
+  and not the driver. The [ScanType](https://pkg.go.dev/database/sql#ColumnType.ScanType)
+  of such values is `string`, while the [DatabaseTypeName](https://pkg.go.dev/database/sql#ColumnType.DatabaseTypeName)
+  is `DECIMAL`. Retrieving precision and scale using the
+  [DecimalSize API](https://pkg.go.dev/database/sql#ColumnType.DecimalSize) is supported.
 
-## Support
+## Context support
+
+The driver methods recognize [Context](https://pkg.go.dev/context) and support early cancellation in most cases.
+As expected, the `Query` methods return early before all rows are retrieved.
+`Exec` methods return after the operation completes (this may be configurable in the future).
+`Exec` methods can still be stopped early by cancelling the context from another goroutine.
+
+It is also supported to use a `Query` method for a DDL/DML statement if you need the method
+to return before the statement completes.
+In that case, calling [Rows.Next](https://pkg.go.dev/database/sql#Rows.Next)
+will wait for the statement to complete and then return `false`.
+
+## Compatibility and Support
 
 The library is actively tested with Impala 4.4 and 3.4.
 All 3.x and 4.x minor versions should work well. 2.x is also supported
 on a best-effort basis.
 
 File any issues that you encounter as GitHub issues.
+
+The library is *not* compatible with [TinyGo](https://tinygo.org/) because
+Thrift for Go requires [tls.Listen](https://pkg.go.dev/crypto/tls#Listen) which is not implemented by TinyGo at this
+time.
 
 ## Copyright and acknowledgements
 

@@ -414,23 +414,40 @@ func testInsert(t *testing.T, conn *sql.DB) {
 	require.NoError(t, err)
 	_, err = conn.Exec("CREATE TABLE test(a varchar)")
 	require.NoError(t, err)
-	insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (?)", now)
-	require.NoError(t, err)
-	rowsAdded, err := insertRes.RowsAffected()
-	require.NoError(t, err)
-	require.Equal(t, int64(1), rowsAdded)
+	t.Cleanup(func() {
+		_, err = conn.Exec("DROP TABLE IF EXISTS test")
+		require.NoError(t, err)
+	})
 
-	// Use Prepare to exercise that codepath
-	st, err := conn.Prepare("SELECT * FROM test WHERE a = ? LIMIT 1")
-	require.NoError(t, err)
-	selectRes, err := st.Query(now)
-	require.NoError(t, err)
-	defer fi.NoErrorF(selectRes.Close, t)
-	require.True(t, selectRes.Next())
-	var val string
-	require.NoError(t, selectRes.Scan(&val))
-	require.Equal(t, now.Format(hive.TimestampFormat), val)
-	require.NoError(t, st.Close()) // close is no-op anyway
+	t.Run("data inserted", func(t *testing.T) {
+		insertRes, err := conn.Exec("INSERT INTO test (a) VALUES (?)", now)
+		require.NoError(t, err)
+		rowsAdded, err := insertRes.RowsAffected()
+		require.NoError(t, err)
+		require.Equal(t, int64(1), rowsAdded)
+
+		// Use Prepare to exercise that codepath
+		st, err := conn.Prepare("SELECT * FROM test WHERE a = ? LIMIT 1")
+		require.NoError(t, err)
+		selectRes, err := st.Query(now)
+		require.NoError(t, err)
+		defer fi.NoErrorF(selectRes.Close, t)
+		require.True(t, selectRes.Next())
+		var val string
+		require.NoError(t, selectRes.Scan(&val))
+		require.Equal(t, now.Format(hive.TimestampFormat), val)
+		require.NoError(t, st.Close()) // close is no-op anyway
+	})
+
+	t.Run("cancel DML from Query", func(t *testing.T) {
+		startTime := time.Now()
+		dmlRes, err := conn.Query("INSERT INTO test (a) VALUES (cast(SLEEP(10000) as string))")
+		require.NoError(t, err)
+		err = dmlRes.Close()
+		require.NoError(t, err)
+		require.Less(t, time.Since(startTime), 5*time.Second)
+	})
+
 }
 
 const dbPort = "21050/tcp"

@@ -78,24 +78,18 @@ func (op *Operation) GetResultSetMetadata(ctx context.Context) (*TableSchema, er
 	return schema, nil
 }
 
-// FetchResults fetches query result from server
+// FetchResults lazily prepares query result from server
 func (op *Operation) FetchResults(ctx context.Context, schema *TableSchema) (*ResultSet, error) {
-
-	resp, err := fetch(ctx, op)
-	if err != nil {
-		return nil, err
-	}
-
+	// Impala server prepares and buffers the query results before they are fetched.
 	rs := ResultSet{
 		idx:    0,
-		length: length(resp.Results),
-		result: resp.Results,
-		more:   resp.GetHasMoreRows(),
+		length: 0,
+		result: nil,
+		more:   true,
 		schema: schema,
 		// TODO align query context handling with database/sql practices (Github #14)
 		fetchfn: func() (*cli_service.TFetchResultsResp, error) { return fetch(ctx, op) },
 	}
-
 	return &rs, nil
 }
 
