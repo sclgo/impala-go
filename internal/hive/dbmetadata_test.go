@@ -40,7 +40,7 @@ func TestDBMetadata_GetTablesSeq(t *testing.T) {
 		seq, errPtr := dbMeta.GetTablesSeq(context.Background(), "", "")
 		require.NotNil(t, errPtr)
 		require.NoError(t, *errPtr)
-		slices.Collect(seq)
+		_ = slices.Collect(seq)
 		require.NoError(t, *errPtr)
 		require.NotZero(t, mock.closeCalls)
 	})

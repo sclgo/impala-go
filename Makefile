@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := test
+
 .PHONY: thrift
 thrift:
 	thrift -r -gen go:package_prefix=github.com/sclgo/impala-go/internal/generated/ interfaces/ImpalaService.thrift
@@ -11,7 +13,7 @@ usql: Makefile
 	go run github.com/sclgo/usqlgen@v0.3.0 -v build --get github.com/sclgo/impala-go@$(shell git branch --show-current || echo master) -- -tags impala
 
 short-test:
-	go test -short -v ./...
+	go test -short -v -vet=all ./...
 
 .PHONY: test-cli
 test-cli: usql
