@@ -62,7 +62,9 @@ jobs:
 
       - name: Test
         run: |
-          make short-test        
+# check-vuln when testing with old Go ensures that go directive is set to the minimum
+# toolchain version without vulnerabilities that impact the code
+          make short-test check-vuln     
 
   post-merge:
     runs-on: ubuntu-latest
