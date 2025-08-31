@@ -42,7 +42,7 @@ test:
 lint:
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.5 run -v
 
-checks: check_changes check_deps check_tidy check_vuln
+checks: check_changes check_deps check_tidy check_vuln check_modern
 
 check_changes:
 # make sure .next.version contains the intended next version
@@ -65,3 +65,9 @@ check_tidy:
 .PHONY: check_vuln
 check_vuln:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+.PHONY: check_modern
+check_modern:
+	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest ./...
+# non-zero exit status on issues found
+# nb: modernize is not part of golangci-lint yet - https://github.com/golangci/golangci-lint/issues/686

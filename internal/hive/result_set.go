@@ -58,7 +58,7 @@ func isSet(bitmap []byte, i int) bool {
 	return bitmap[i/8]&(1<<(uint(i)%8)) != 0
 }
 
-func value(col *cli_service.TColumn, cd *ColDesc, i int) (interface{}, error) {
+func value(col *cli_service.TColumn, cd *ColDesc, i int) (any, error) {
 	switch cd.DatabaseTypeName {
 	case "STRING", "CHAR", "VARCHAR":
 		if isSet(col.StringVal.Nulls, i) {

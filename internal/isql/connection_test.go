@@ -293,7 +293,7 @@ func testPinger(t *testing.T, db *sql.DB) {
 
 type selectTestCase struct {
 	sql string
-	res interface{}
+	res any
 
 	// The following are defined only for some tests
 	dbType           string
@@ -323,7 +323,7 @@ func testSelectOneIntoAny(t *testing.T, db *sql.DB) {
 		{sql: "sleep(2000)", res: true},
 	}
 
-	var res interface{}
+	var res any
 
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
