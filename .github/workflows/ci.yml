@@ -61,9 +61,9 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Test
-        run: make short-test check-vuln
+        run: make short-test check_vuln
 # check-vuln when testing with old Go ensures that go directive is set to the minimum
-# toolchain version without vulnerabilities that impact the code           
+# toolchain version without vulnerabilities that impact the code
 
   post-merge:
     runs-on: ubuntu-latest
