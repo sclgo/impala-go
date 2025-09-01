@@ -7,12 +7,14 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/samber/lo"
@@ -187,30 +189,15 @@ func (c *connector) Driver() driver.Driver {
 }
 
 func connect(opts *Options) (*isql.Conn, error) {
-	transport, tlsConf, err := configureTransport(opts)
-	if err != nil {
-		return nil, fmt.Errorf(badDSNErrorPrefix+"%w", err)
+	if opts.LogOut == nil {
+		opts.LogOut = io.Discard
 	}
-
-	protocol := thrift.NewTBinaryProtocolConf(transport, &thrift.TConfiguration{
-		// The following configuration is propagated to Transport / Socket
-		TBinaryStrictRead:  lo.ToPtr(false),
-		TBinaryStrictWrite: lo.ToPtr(true),
-		TLSConfig:          tlsConf,
-		// TODO SocketTimeout, ConnectTimeout Github #34
-	})
-
-	if err = transport.Open(); err != nil {
-		addInfo := ""
-		if tlsConf != nil && tlsConf.RootCAs == nil {
-			addInfo = " using system root CAs"
-		}
-		return nil, fmt.Errorf("impala: failed to open connection%s: %w", addInfo, err)
+	transport, tclient, err := connectThrift(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
-
-	tclient := thrift.NewTStandardClient(protocol, protocol)
 	client := hive.NewClient(tclient, logger, &hive.Options{
 		MaxRows:      int64(opts.BatchSize),
 		MemLimit:     opts.MemoryLimit,
@@ -286,4 +273,30 @@ func readCert(certPath string) (*x509.CertPool, error) {
 		return nil, errors.New("failed to parse CA certificate")
 	}
 	return caCertPool, nil
+}
+
+func connectThrift(opts *Options) (thrift.TTransport, thrift.TClient, error) {
+	transport, tlsConf, err := configureTransport(opts)
+	if err != nil {
+		return nil, nil, fmt.Errorf(badDSNErrorPrefix+"%w", err)
+	}
+
+	protocol := thrift.NewTBinaryProtocolConf(transport, &thrift.TConfiguration{
+		// The following configuration is propagated to Transport / Socket
+		TBinaryStrictRead:  lo.ToPtr(false),
+		TBinaryStrictWrite: lo.ToPtr(true),
+		TLSConfig:          tlsConf,
+		SocketTimeout:      10 * time.Second,
+	})
+
+	if err = transport.Open(); err != nil {
+		addInfo := ""
+		if tlsConf != nil && tlsConf.RootCAs == nil {
+			addInfo = " using system root CAs"
+		}
+		return nil, nil, fmt.Errorf("impala: failed to open connection%s: %w", addInfo, err)
+	}
+
+	tclient := thrift.NewTStandardClient(protocol, protocol)
+	return transport, tclient, nil
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -20,10 +21,10 @@ var (
 
 // Conn to impala. It is not used concurrently by multiple goroutines.
 type Conn struct {
-	t       thrift.TTransport
-	session *hive.Session
-	client  *hive.Client
-	log     *log.Logger
+	transportCloser io.Closer
+	session         *hive.Session
+	client          *hive.Client
+	log             *log.Logger
 }
 
 // Ping impala server
@@ -143,7 +144,7 @@ func (c *Conn) Close() error {
 		}
 	}
 
-	if err := c.t.Close(); err != nil {
+	if err := c.transportCloser.Close(); err != nil {
 		return fmt.Errorf("failed to close underlying transport while closing connection: %w", err)
 	}
 	return nil
@@ -151,8 +152,8 @@ func (c *Conn) Close() error {
 
 func NewConn(client *hive.Client, transport thrift.TTransport, logger *log.Logger) *Conn {
 	return &Conn{
-		t:      transport,
-		client: client,
-		log:    logger,
+		transportCloser: transport,
+		client:          client,
+		log:             logger,
 	}
 }

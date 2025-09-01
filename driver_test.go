@@ -1,10 +1,14 @@
 package impala
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net"
+	"strconv"
 	"testing"
 
+	"github.com/murfffi/gorich/fi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -88,4 +92,33 @@ func TestParseURI_Negative(t *testing.T) {
 		require.ErrorContains(t, err, badDSNErrorPrefix)
 		require.ErrorContains(t, err, "certificate")
 	})
+}
+
+func TestDriver_Integration(t *testing.T) {
+	fi.SkipLongTest(t)
+	t.Run("openUnresponsive", func(t *testing.T) {
+		port := createUnresponsiveSocket(t)
+
+		opts := &Options{
+			Host: "localhost",
+			Port: strconv.Itoa(port),
+		}
+		conn, err := connect(opts)
+		require.NoError(t, err)
+		_, err = conn.OpenSession(context.Background()) // thrift ignores context anyway in most cases
+		require.ErrorContains(t, err, "bad connection")
+	})
+}
+
+func createUnresponsiveSocket(t *testing.T) int {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	fi.CleanupF(t, listener.Close)
+	go func() {
+		var lerr error
+		for lerr == nil {
+			_, lerr = listener.Accept()
+		}
+	}()
+	return listener.Addr().(*net.TCPAddr).Port
 }

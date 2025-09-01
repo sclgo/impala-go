@@ -42,15 +42,15 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: code-coverage-report-${{ matrix.go-version }}
-        path: ./coverage/coverage.html      
+        path: ./coverage/coverage.html
 
   ci-oldgo:
     strategy:
       matrix:
-        go:
+        go-version:
           - 1.23
           - 1.24
-    
+
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,13 +58,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5.3.0
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go-version }}
 
       - name: Test
         run: |
 # check-vuln when testing with old Go ensures that go directive is set to the minimum
 # toolchain version without vulnerabilities that impact the code
-          make short-test check-vuln     
+          make short-test check-vuln
 
   post-merge:
     runs-on: ubuntu-latest
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5.3.0
         with:
           go-version: '1.23'
 
