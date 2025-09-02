@@ -9,6 +9,7 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/google/uuid v1.6.0
+	github.com/jinzhu/copier v0.4.0
 	github.com/murfffi/gorich v0.2.0
 	github.com/samber/lo v1.51.0
 	github.com/stretchr/testify v1.10.0

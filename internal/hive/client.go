@@ -19,8 +19,12 @@ type Client struct {
 
 // Options for Hive Client
 type Options struct {
-	MaxRows      int64
-	MemLimit     string
+	MaxRows int64
+	// MemLimit configures the MEM_LIMIT Impala property at session level
+	// https://impala.apache.org/docs/build/html/topics/impala_mem_limit.html
+	MemLimit string
+	// QueryTimeout in seconds - for QUERY_TIMEOUT_S session configuration value
+	// https://impala.apache.org/docs/build/html/topics/impala_query_timeout_s.html
 	QueryTimeout int
 }
 

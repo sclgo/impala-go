@@ -133,6 +133,16 @@ func parseURI(uri string) (*Options, error) {
 		return nil, err
 	}
 
+	err = parseDurationKey(query, "socket-timeout", &opts.SocketTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	err = parseDurationKey(query, "connect-timeout", &opts.SocketTimeout)
+	if err != nil {
+		return nil, err
+	}
+
 	logDest, ok := query["log"]
 	if ok {
 		if strings.ToLower(logDest[0]) == "stderr" {
@@ -141,6 +151,17 @@ func parseURI(uri string) (*Options, error) {
 	}
 
 	return &opts, nil
+}
+
+func parseDurationKey(query url.Values, key string, target *time.Duration) (err error) {
+	values, ok := query[key]
+	if ok {
+		*target, err = time.ParseDuration(values[0])
+		if err != nil && strings.Contains(err.Error(), "missing unit in duration") {
+			*target, err = time.ParseDuration(values[0] + "ms")
+		}
+	}
+	return
 }
 
 func parseIntKey(query url.Values, key string, target *int) (err error) {
@@ -286,7 +307,8 @@ func connectThrift(opts *Options) (thrift.TTransport, thrift.TClient, error) {
 		TBinaryStrictRead:  lo.ToPtr(false),
 		TBinaryStrictWrite: lo.ToPtr(true),
 		TLSConfig:          tlsConf,
-		SocketTimeout:      10 * time.Second,
+		SocketTimeout:      opts.SocketTimeout,
+		ConnectTimeout:     opts.ConnectTimeout,
 	})
 
 	if err = transport.Open(); err != nil {

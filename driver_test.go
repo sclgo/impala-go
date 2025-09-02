@@ -3,11 +3,12 @@ package impala
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/jinzhu/copier"
 	"github.com/murfffi/gorich/fi"
 	"github.com/stretchr/testify/require"
 )
@@ -19,51 +20,54 @@ func TestParseURI(t *testing.T) {
 	}{
 		{
 			"impala://localhost",
-			Options{Host: "localhost", Port: "21050", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+			Options{Host: "localhost"},
 		},
 		{
 			"impala://localhost:21000",
-			Options{Host: "localhost", Port: "21000", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+			Options{Host: "localhost", Port: "21000"},
 		},
 		{
 			"impala://admin@localhost",
-			Options{Host: "localhost", Port: "21050", Username: "admin", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+			Options{Host: "localhost", Username: "admin"},
 		},
 		{
 			"impala://admin:password@localhost",
-			Options{Host: "localhost", Port: "21050", Username: "admin", Password: "password", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+			Options{Host: "localhost", Username: "admin", Password: "password"},
 		},
 		{
 			"impala://admin:p%40ssw0rd@localhost",
-			Options{Host: "localhost", Port: "21050", Username: "admin", Password: "p@ssw0rd", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+			Options{Host: "localhost", Username: "admin", Password: "p@ssw0rd"},
 		},
 		{
 			"impala://admin:p%40ssw0rd@localhost?auth=ldap",
-			Options{Host: "localhost", Port: "21050", Username: "admin", Password: "p@ssw0rd", UseLDAP: true, BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+			Options{Host: "localhost", Username: "admin", Password: "p@ssw0rd", UseLDAP: true},
 		},
 		{
 			"impala://localhost?tls=true&ca-cert=/etc/ca.crt",
-			Options{Host: "localhost", Port: "21050", UseTLS: true, CACertPath: "/etc/ca.crt", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
-		},
-		{
-			"impala://localhost?tls=true",
-			Options{Host: "localhost", Port: "21050", UseTLS: true, BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard},
+			Options{Host: "localhost", UseTLS: true, CACertPath: "/etc/ca.crt"},
 		},
 		{
 			"impala://localhost?batch-size=2048&buffer-size=2048",
-			Options{Host: "localhost", Port: "21050", BatchSize: 2048, BufferSize: 2048, LogOut: io.Discard},
+			Options{Host: "localhost", BatchSize: 2048, BufferSize: 2048},
 		},
 		{
 			"impala://localhost?mem-limit=1g",
-			Options{Host: "localhost", Port: "21050", BatchSize: 1024, BufferSize: 4096, LogOut: io.Discard, MemoryLimit: "1g"},
+			Options{Host: "localhost", MemoryLimit: "1g"},
+		},
+		{
+			"impala://localhost?socket-timeout=1s",
+			Options{Host: "localhost", SocketTimeout: 1 * time.Second},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
+			expected := DefaultOptions
+			err := copier.CopyWithOption(&expected, tt.out, copier.Option{IgnoreEmpty: true})
+			require.NoError(t, err)
 			opts, err := parseURI(tt.in)
 			require.NoError(t, err)
-			require.Equal(t, tt.out, *opts)
+			require.Equal(t, expected, *opts)
 		})
 	}
 }
@@ -100,8 +104,9 @@ func TestDriver_Integration(t *testing.T) {
 		port := createUnresponsiveSocket(t)
 
 		opts := &Options{
-			Host: "localhost",
-			Port: strconv.Itoa(port),
+			Host:          "localhost",
+			Port:          strconv.Itoa(port),
+			SocketTimeout: time.Second,
 		}
 		conn, err := connect(opts)
 		require.NoError(t, err)

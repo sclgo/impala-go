@@ -39,7 +39,16 @@ Driver name is `impala`.
 * `ca-cert` - The file that contains the public key certificate of the CA that signed the Impala certificate
 * `batch-size` - integer value (default: 1024). Maximum number of rows fetched per request
 * `buffer-size`- in bytes (default: 4096); Buffer size for the Thrift transport 
-* `mem-limit` - string value (example: 3m); Memory limit for query 	
+* `mem-limit` - string value (example: 3m); Memory limit for query, as a share of memory or fixed value. See
+  <https://impala.apache.org/docs/build/html/topics/impala_mem_limit.html> for details.
+* `query-timeout` - integer value in seconds - query timeout. See 
+  <https://impala.apache.org/docs/build/html/topics/impala_query_timeout_s.html> for details.
+* `socket-timeout` - integer or string value (default: 5s) - the maximum socket idle time, expressed as a
+  time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an integer without
+  a time unit, milliseconds are assumed.
+* `connect-timeout` - integer or string value (default: 10s) - the max wait for initial connection to server, 
+  expressed as a  time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an 
+  integer without a time unit, milliseconds are assumed.
 
 A string of this format can be constructed using the URL type in the net/url package.
 
