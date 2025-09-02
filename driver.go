@@ -138,7 +138,7 @@ func parseURI(uri string) (*Options, error) {
 		return nil, err
 	}
 
-	err = parseDurationKey(query, "connect-timeout", &opts.SocketTimeout)
+	err = parseDurationKey(query, "connect-timeout", &opts.ConnectTimeout)
 	if err != nil {
 		return nil, err
 	}
