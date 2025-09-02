@@ -58,6 +58,10 @@ func TestParseURI(t *testing.T) {
 			"impala://localhost?socket-timeout=1s",
 			Options{Host: "localhost", SocketTimeout: 1 * time.Second},
 		},
+		{
+			"impala://localhost?connect-timeout=1",
+			Options{Host: "localhost", ConnectTimeout: 1 * time.Millisecond},
+		},
 	}
 
 	for _, tt := range tests {
@@ -84,7 +88,7 @@ func TestParseURI_Negative(t *testing.T) {
 		require.ErrorContains(t, err, badDSNErrorPrefix)
 		require.ErrorContains(t, err, "parse")
 	})
-	for _, key := range []string{"batch-size", "buffer-size", "query-timeout", "tls"} {
+	for _, key := range []string{"batch-size", "buffer-size", "query-timeout", "tls", "socket-timeout", "connect-timeout"} {
 		t.Run("invalid "+key, func(t *testing.T) {
 			_, err := drv.Open(fmt.Sprintf("impala://localhost?%s=aa", key))
 			require.ErrorContains(t, err, badDSNErrorPrefix)

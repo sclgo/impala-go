@@ -160,6 +160,9 @@ func parseDurationKey(query url.Values, key string, target *time.Duration) (err 
 		if err != nil && strings.Contains(err.Error(), "missing unit in duration") {
 			*target, err = time.ParseDuration(values[0] + "ms")
 		}
+		if err != nil {
+			err = fmt.Errorf("invalid %s: %w", key, err)
+		}
 	}
 	return
 }
