@@ -12,6 +12,7 @@ cli: usql
 usql: Makefile
 	go run github.com/sclgo/usqlgen@v0.3.0 -v build --get github.com/sclgo/impala-go@$(shell git branch --show-current || echo master) -- -tags impala
 
+.PHONY: short-test
 short-test:
 	go test -short -v -vet=all ./...
 
@@ -19,6 +20,7 @@ short-test:
 test-cli: usql
 	./usql -c "\drivers" | grep impala
 
+.PHONY: test
 PKGS=$(shell go list ./... | grep -v "./internal/generated")
 PKGS_LST=$(shell echo ${PKGS} | tr ' ' ',')
 test:
@@ -42,13 +44,16 @@ test:
 lint:
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.5 run -v
 
+.PHONY: checks
 checks: check_changes check_deps check_tidy check_vuln check_modern
 
+.PHONY: check_changes
 check_changes:
 # make sure .next.version contains the intended next version
 # if the following fails, update either the next version or undo any unintended api changes
 	go run golang.org/x/exp/cmd/gorelease@latest -version $(shell cat .next.version)
 
+.PHONY: check_deps
 check_deps:
 # checks for possibly leaked dependencies like in 
 # https://www.dolthub.com/blog/2022-11-07-pruning-test-dependencies-from-golang-binaries/
@@ -57,6 +62,7 @@ check_deps:
 	! (strings enumerateDB | grep testify)
 	! (strings enumerateDB | grep docker)
 
+.PHONY: check_tidy
 check_tidy:
 	go mod tidy
 	# Verify that `go mod tidy` didn't introduce any changes. Run go mod tidy before pushing.
