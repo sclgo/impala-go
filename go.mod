@@ -1,8 +1,6 @@
 module github.com/sclgo/impala-go
 
-go 1.23.6
-
-toolchain go1.23.12
+go 1.24.5
 
 require (
 	github.com/apache/thrift v0.22.0
@@ -10,8 +8,8 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jinzhu/copier v0.4.0
-	github.com/murfffi/gorich v0.2.0
-	github.com/samber/lo v1.51.0
+	github.com/murfffi/gorich v0.3.0
+	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.38.0
 )
@@ -66,7 +64,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250106144421-5f5ef82da422 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250106144421-5f5ef82da422 // indirect
