@@ -1,4 +1,7 @@
-issues:
-  exclude-dirs:
-    - "examples/"
-  exclude-generated: lax
+version: "2"
+linters:
+  exclusions:
+    generated: lax
+    paths:
+      - "examples/"
+
