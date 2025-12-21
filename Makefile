@@ -42,7 +42,7 @@ test:
 #NB: CI uses the golangci-lint Github action, not this target
 .PHONY: lint
 lint:
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.5 run -v
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2 run -v
 
 .PHONY: checks
 checks: check_changes check_deps check_tidy check_vuln check_modern

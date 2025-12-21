@@ -575,7 +575,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Name:       "ldapserver",
 		WaitingFor: wait.ForLog("slapd starting"),
 		HostConfigModifier: func(config *container.HostConfig) {
-			config.Resources.Ulimits = append(config.Resources.Ulimits, &units.Ulimit{
+			config.Ulimits = append(config.Ulimits, &units.Ulimit{
 				Name: "nofile",
 				Hard: 1024,
 				Soft: 1024,
