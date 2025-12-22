@@ -1,4 +1,4 @@
-package isql_test
+package ftest
 
 // Integration tests for driver
 // Create or update connection_int_test.go to add unit tests
@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cockroachdb/apd/v3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/go-units"
@@ -42,9 +43,22 @@ var (
 )
 
 func init() {
+	// For pprof handler. See blank import above.
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
+}
+
+func getConfRoot(t *testing.T) string {
+	confRoot := fi.NoError(filepath.Abs(".")).Require(t)
+	require.DirExists(t, confRoot)
+	return confRoot
+}
+
+func getSslConfDir(t *testing.T) string {
+	sslConfDir := filepath.Join(getConfRoot(t), "testssl")
+	require.DirExists(t, sslConfDir)
+	return sslConfDir
 }
 
 func TestIntegration_FromEnv(t *testing.T) {
@@ -157,6 +171,9 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 	})
 	t.Run("Connection State", func(t *testing.T) {
 		testConnState(t, db)
+	})
+	t.Run("decimal support", func(t *testing.T) {
+		testDecimal(t, db)
 	})
 }
 
@@ -281,7 +298,7 @@ func startImpala4(t *testing.T) string {
 	ctx := context.Background()
 	c := setupStack(ctx, t)
 	dsn := getDsn(ctx, t, c, impala4User)
-	certPath := filepath.Join("..", "..", "compose", "testssl", "localhost.crt")
+	certPath := filepath.Join(getSslConfDir(t), "localhost.crt")
 	dsn += "&auth=ldap"
 	dsn += "&tls=true&ca-cert=" + fi.NoError(filepath.Abs(certPath)).Require(t)
 	return dsn
@@ -289,6 +306,25 @@ func startImpala4(t *testing.T) string {
 
 func testPinger(t *testing.T, db *sql.DB) {
 	require.NoError(t, db.Ping())
+}
+
+func testDecimal(t *testing.T, db *sql.DB) {
+	var res apd.Decimal
+	rows, err := db.Query("select cast(1.1 as decimal(10,2))")
+	require.NoError(t, err)
+	column := fi.NoError(rows.ColumnTypes()).Require(t)[0]
+	assert.Equal(t, reflect.TypeFor[string]().String(), column.ScanType().String())
+	assert.Equal(t, "DECIMAL", column.DatabaseTypeName())
+	a, b, ok := column.DecimalSize()
+	assert.NotEmpty(t, a)
+	assert.NotEmpty(t, b)
+	assert.True(t, ok)
+
+	require.True(t, rows.Next())
+	err = rows.Scan(&res)
+	require.NoError(t, err)
+	expected, _, _ := apd.NewFromString("1.10")
+	require.Equal(t, 0, expected.Cmp(&res))
 }
 
 type selectTestCase struct {
@@ -499,7 +535,8 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		return docker.VolumeRemove(context.Background(), warehouseVol.Name, true)
 	})
 	warehouseMount := testcontainers.VolumeMount(warehouseVol.Name, "/user/hive/warehouse")
-	localHiveSite := fi.NoError(filepath.Abs("../../compose/quickstart_conf/hive-site.xml")).Require(t)
+	localHiveSite := filepath.Join(getConfRoot(t), "quickstart_conf", "hive-site.xml")
+	require.FileExists(t, localHiveSite)
 
 	req := testcontainers.ContainerRequest{
 		Image:    "apache/impala:4.4.1-impala_quickstart_hms",
@@ -612,7 +649,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Networks: []string{netReq.Name},
 		Binds: []string{
 			localHiveSite + ":" + "/opt/impala/conf/hive-site.xml",
-			fi.NoError(filepath.Abs("../../compose/testssl")).Require(t) + ":" + "/ssl",
+			getSslConfDir(t) + ":" + "/ssl",
 		},
 		WaitingFor: waitRule,
 		Mounts: testcontainers.ContainerMounts{
