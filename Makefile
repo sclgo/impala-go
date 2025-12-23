@@ -33,11 +33,11 @@ test: tools/ts
 	go test -race -cover -covermode atomic -coverpkg "${PKGS_LST}" -v -vet=all -timeout 15m -p 1\
 		${PKGS} \
 		-args -test.gocoverdir="${PWD}/coverage/covdata" \
-		| ts -s
+		| tools/ts -s
 	cd functest && go test -race -cover -covermode atomic -coverpkg "${PKGS_LST}" -v -timeout 15m -p 1\
 		./... \
 		-args -test.gocoverdir="$(PWD)/coverage/covdata" \
-		| ts -s
+		| ../tools/ts -s
 
 	go tool covdata percent -i=./coverage/covdata
 	# Convert to old text format for coveralls upload
