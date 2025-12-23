@@ -39,6 +39,13 @@ test: tools/ts
 		-args -test.gocoverdir="$(PWD)/coverage/covdata" \
 		| ../tools/ts -s
 
+	ls -lh ./coverage/covdata
+	rm -fr ./coverage/stage
+	mv ./coverage/covdata ./coverage/stage
+	mkdir -p coverage/covdata
+	go tool covdata merge -i=./coverage/stage -o=./coverage/covdata
+	ls -lh ./coverage/covdata
+
 	go tool covdata percent -i=./coverage/covdata
 	# Convert to old text format for coveralls upload
 	go tool covdata textfmt -i=./coverage/covdata -o ./coverage/covprofile
