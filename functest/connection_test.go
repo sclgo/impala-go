@@ -296,7 +296,7 @@ func startImpala3(t *testing.T) string {
 
 func startImpala4(t *testing.T) string {
 	ctx := context.Background()
-	c := setupStack(ctx, t)
+	c := setupStack(ctx, t, StackOpts{})
 	dsn := getDsn(ctx, t, c, impala4User)
 	certPath := filepath.Join(getSslConfDir(t), "localhost.crt")
 	dsn += "&auth=ldap"
@@ -511,7 +511,12 @@ func toCloser(ct testcontainers.Container, t *testing.T) func() error {
 	}
 }
 
-func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
+type StackOpts struct {
+	krb5ConfPath string
+	keytabPath   string
+}
+
+func setupStack(ctx context.Context, t *testing.T, opts StackOpts) testcontainers.Container {
 	//nolint - deprecated but alternative doesn't allow customizing name; default name is invalid
 	netReq := testcontainers.NetworkRequest{
 		Driver: "bridge",
@@ -574,6 +579,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		Name:       "statestored",
 		WaitingFor: wait.ForLog("ThriftServer 'StatestoreService' started"),
 	}
+	setKerbOptions(opts, &req)
 	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
@@ -664,6 +670,7 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 		//	Consumers: []testcontainers.LogConsumer{&testcontainers.StdoutLogConsumer{}},
 		//},
 	}
+	setKerbOptions(opts, &req)
 	ct, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
@@ -672,6 +679,20 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 	fi.CleanupF(t, toCloser(ct, t))
 
 	return ct
+}
+
+func setKerbOptions(opts StackOpts, req *testcontainers.ContainerRequest) {
+	if opts.keytabPath != "" {
+		req.Cmd = append(req.Cmd,
+			"-kerberos_reinit_interval=60",
+			"-principal=impala/impala_host.example.com@TEST.EXAMPLE.COM",
+			"-keytab_file=/opt/impala/conf/impala.keytab",
+		)
+		req.Binds = append(req.Binds, opts.keytabPath+":/opt/impala/conf/impala.keytab")
+	}
+	if opts.krb5ConfPath != "" {
+		req.Binds = append(req.Binds, opts.krb5ConfPath+":/etc/krb5.conf")
+	}
 }
 
 func getDsn(ctx context.Context, t *testing.T, c testcontainers.Container, userinfo *url.Userinfo) string {
