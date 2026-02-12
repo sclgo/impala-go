@@ -63,7 +63,7 @@ checks: check_changes check_deps check_tidy check_vuln check_modern
 check_changes:
 # make sure .next.version contains the intended next version
 # if the following fails, update either the next version or undo any unintended api changes
-	go run golang.org/x/exp/cmd/gorelease@latest -version $(shell cat .next.version)
+	go run golang.org/x/exp/cmd/gorelease@v0.0.0-20260112195511-716be5621a96 -version $(shell cat .next.version)
 
 .PHONY: check_deps
 check_deps:
