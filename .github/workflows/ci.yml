@@ -18,7 +18,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5.3.0
       with:
-        go-version: "1.25.7"
+        go-version: "1.25.8"
 
     - name: Build
       run: go build -v ./...
@@ -61,7 +61,7 @@ jobs:
 
       - name: Test
         run: make short-test check_vuln
-# check-vuln when testing with old Go ensures that go directive is set to the minimum
+# check-vuln when testing with old Go ensures that go directive or, toolchain directive if present, is set to the minimum
 # toolchain version without vulnerabilities that impact the code
 
   post-merge:
