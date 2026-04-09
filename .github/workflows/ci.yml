@@ -76,3 +76,5 @@ jobs:
 
       - name: Test CLI
         run: make test-cli
+        env:
+          GOTOOLCHAIN: auto        
