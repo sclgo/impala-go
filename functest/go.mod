@@ -1,6 +1,6 @@
 module github.com/sclgo/impala-go/functest
 
-go 1.26.2
+go 1.25.9
 
 require (
 	github.com/cockroachdb/apd/v3 v3.2.1
