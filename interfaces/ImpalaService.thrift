@@ -95,34 +95,34 @@ struct TCloseImpalaOperationResp {
 
 // Impala HiveServer2 service
 
-struct TGetExecSummaryReq {
-  1: optional cli_service.TOperationHandle operationHandle
+// struct TGetExecSummaryReq {
+//   1: optional cli_service.TOperationHandle operationHandle
 
-  2: optional cli_service.TSessionHandle sessionHandle
+//   2: optional cli_service.TSessionHandle sessionHandle
 
-  // If true, returns the summaries of all query attempts. A TGetExecSummaryResp
-  // always returns the profile for the most recent query attempt, regardless of the
-  // query id specified. Clients should set this to true if they want to retrieve the
-  // summaries of all query attempts (including the failed ones).
-  3: optional bool include_query_attempts = false
-}
+//   // If true, returns the summaries of all query attempts. A TGetExecSummaryResp
+//   // always returns the profile for the most recent query attempt, regardless of the
+//   // query id specified. Clients should set this to true if they want to retrieve the
+//   // summaries of all query attempts (including the failed ones).
+//   3: optional bool include_query_attempts = false
+// }
 
-struct TGetExecSummaryResp {
-  1: required cli_service.TStatus status
+// struct TGetExecSummaryResp {
+//   1: required cli_service.TStatus status
 
-  2: optional ExecStats.TExecSummary summary
+//   2: optional ExecStats.TExecSummary summary
 
-  // A list of all summaries of the failed query attempts.
-  3: optional list<ExecStats.TExecSummary> failed_summaries
-}
+//   // A list of all summaries of the failed query attempts.
+//   3: optional list<ExecStats.TExecSummary> failed_summaries
+// }
 
 
 service ImpalaHiveServer2Service extends cli_service.TCLIService {
-  // Returns the exec summary for the given query. The exec summary is only valid for
-  // queries that execute with Impala's backend, i.e. QUERY, DML and COMPUTE_STATS
-  // queries. Otherwise a default-initialized TExecSummary is returned for
-  // backwards-compatibility with impala-shell - see IMPALA-9729.
-  TGetExecSummaryResp GetExecSummary(1:TGetExecSummaryReq req);
+  // // Returns the exec summary for the given query. The exec summary is only valid for
+  // // queries that execute with Impala's backend, i.e. QUERY, DML and COMPUTE_STATS
+  // // queries. Otherwise a default-initialized TExecSummary is returned for
+  // // backwards-compatibility with impala-shell - see IMPALA-9729.
+  // TGetExecSummaryResp GetExecSummary(1:TGetExecSummaryReq req);
 
   // Client calls this RPC to verify that the server is an ImpalaService. Returns the
   // server version.

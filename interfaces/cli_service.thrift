@@ -1151,7 +1151,7 @@ service TCLIService {
 
   TExecuteStatementResp ExecuteStatement(1:TExecuteStatementReq req);
 
-  TGetTypeInfoResp GetTypeInfo(1:TGetTypeInfoReq req);
+  // TGetTypeInfoResp GetTypeInfo(1:TGetTypeInfoReq req);
 
   TGetCatalogsResp GetCatalogs(1:TGetCatalogsReq req);
 
@@ -1175,11 +1175,11 @@ service TCLIService {
 
   TFetchResultsResp FetchResults(1:TFetchResultsReq req);
 
-  TGetDelegationTokenResp GetDelegationToken(1:TGetDelegationTokenReq req);
+  // TGetDelegationTokenResp GetDelegationToken(1:TGetDelegationTokenReq req);
 
-  TCancelDelegationTokenResp CancelDelegationToken(1:TCancelDelegationTokenReq req);
+  // TCancelDelegationTokenResp CancelDelegationToken(1:TCancelDelegationTokenReq req);
 
-  TRenewDelegationTokenResp RenewDelegationToken(1:TRenewDelegationTokenReq req);
+  // TRenewDelegationTokenResp RenewDelegationToken(1:TRenewDelegationTokenReq req);
 
   // Not present in Hive 0.13, re-added for backwards compatibility.
   TGetLogResp GetLog(1:TGetLogReq req);
