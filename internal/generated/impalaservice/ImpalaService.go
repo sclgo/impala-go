@@ -13,7 +13,6 @@ import (
 	thrift "github.com/apache/thrift/lib/go/thrift"
 	"strings"
 	"regexp"
-	"github.com/sclgo/impala-go/internal/generated/execstats"
 	"github.com/sclgo/impala-go/internal/generated/cli_service"
 
 )
@@ -31,7 +30,6 @@ var _ = thrift.ZERO
 var _ = strings.Contains
 var _ = regexp.MatchString
 
-var _ = execstats.GoUnusedProtection__
 var _ = cli_service.GoUnusedProtection__
 // Attributes:
 //  - RowsModified
@@ -1470,511 +1468,9 @@ func (p *TCloseImpalaOperationResp) Validate() error {
 	return nil
 }
 
-// Attributes:
-//  - OperationHandle
-//  - SessionHandle
-//  - IncludeQueryAttempts
-// 
-type TGetExecSummaryReq struct {
-	OperationHandle *cli_service.TOperationHandle `thrift:"operationHandle,1" db:"operationHandle" json:"operationHandle,omitempty"`
-	SessionHandle *cli_service.TSessionHandle `thrift:"sessionHandle,2" db:"sessionHandle" json:"sessionHandle,omitempty"`
-	IncludeQueryAttempts bool `thrift:"include_query_attempts,3" db:"include_query_attempts" json:"include_query_attempts"`
-}
-
-func NewTGetExecSummaryReq() *TGetExecSummaryReq {
-	return &TGetExecSummaryReq{}
-}
-
-var TGetExecSummaryReq_OperationHandle_DEFAULT *cli_service.TOperationHandle
-
-func (p *TGetExecSummaryReq) GetOperationHandle() *cli_service.TOperationHandle {
-	if !p.IsSetOperationHandle() {
-		return TGetExecSummaryReq_OperationHandle_DEFAULT
-	}
-	return p.OperationHandle
-}
-
-var TGetExecSummaryReq_SessionHandle_DEFAULT *cli_service.TSessionHandle
-
-func (p *TGetExecSummaryReq) GetSessionHandle() *cli_service.TSessionHandle {
-	if !p.IsSetSessionHandle() {
-		return TGetExecSummaryReq_SessionHandle_DEFAULT
-	}
-	return p.SessionHandle
-}
-
-var TGetExecSummaryReq_IncludeQueryAttempts_DEFAULT bool = false
-
-
-func (p *TGetExecSummaryReq) GetIncludeQueryAttempts() bool {
-	return p.IncludeQueryAttempts
-}
-
-func (p *TGetExecSummaryReq) IsSetOperationHandle() bool {
-	return p.OperationHandle != nil
-}
-
-func (p *TGetExecSummaryReq) IsSetSessionHandle() bool {
-	return p.SessionHandle != nil
-}
-
-func (p *TGetExecSummaryReq) IsSetIncludeQueryAttempts() bool {
-	return p.IncludeQueryAttempts != TGetExecSummaryReq_IncludeQueryAttempts_DEFAULT
-}
-
-func (p *TGetExecSummaryReq) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	if _, err := iprot.ReadStructBegin(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
-	}
-
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
-		}
-		if fieldTypeId == thrift.STOP {
-			break
-		}
-		switch fieldId {
-		case 1:
-			if fieldTypeId == thrift.STRUCT {
-				if err := p.ReadField1(ctx, iprot); err != nil {
-					return err
-				}
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		case 2:
-			if fieldTypeId == thrift.STRUCT {
-				if err := p.ReadField2(ctx, iprot); err != nil {
-					return err
-				}
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		case 3:
-			if fieldTypeId == thrift.BOOL {
-				if err := p.ReadField3(ctx, iprot); err != nil {
-					return err
-				}
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		default:
-			if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-				return err
-			}
-		}
-		if err := iprot.ReadFieldEnd(ctx); err != nil {
-			return err
-		}
-	}
-	if err := iprot.ReadStructEnd(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryReq) ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
-	p.OperationHandle = &cli_service.TOperationHandle{}
-	if err := p.OperationHandle.Read(ctx, iprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.OperationHandle), err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryReq) ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
-	p.SessionHandle = &cli_service.TSessionHandle{}
-	if err := p.SessionHandle.Read(ctx, iprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.SessionHandle), err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryReq) ReadField3(ctx context.Context, iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadBool(ctx); err != nil {
-		return thrift.PrependError("error reading field 3: ", err)
-	} else {
-		p.IncludeQueryAttempts = v
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryReq) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	if err := oprot.WriteStructBegin(ctx, "TGetExecSummaryReq"); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
-	}
-	if p != nil {
-		if err := p.writeField1(ctx, oprot); err != nil { return err }
-		if err := p.writeField2(ctx, oprot); err != nil { return err }
-		if err := p.writeField3(ctx, oprot); err != nil { return err }
-	}
-	if err := oprot.WriteFieldStop(ctx); err != nil {
-		return thrift.PrependError("write field stop error: ", err)
-	}
-	if err := oprot.WriteStructEnd(ctx); err != nil {
-		return thrift.PrependError("write struct stop error: ", err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryReq) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if p.IsSetOperationHandle() {
-		if err := oprot.WriteFieldBegin(ctx, "operationHandle", thrift.STRUCT, 1); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:operationHandle: ", p), err)
-		}
-		if err := p.OperationHandle.Write(ctx, oprot); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.OperationHandle), err)
-		}
-		if err := oprot.WriteFieldEnd(ctx); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field end error 1:operationHandle: ", p), err)
-		}
-	}
-	return err
-}
-
-func (p *TGetExecSummaryReq) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if p.IsSetSessionHandle() {
-		if err := oprot.WriteFieldBegin(ctx, "sessionHandle", thrift.STRUCT, 2); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:sessionHandle: ", p), err)
-		}
-		if err := p.SessionHandle.Write(ctx, oprot); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.SessionHandle), err)
-		}
-		if err := oprot.WriteFieldEnd(ctx); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field end error 2:sessionHandle: ", p), err)
-		}
-	}
-	return err
-}
-
-func (p *TGetExecSummaryReq) writeField3(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if p.IsSetIncludeQueryAttempts() {
-		if err := oprot.WriteFieldBegin(ctx, "include_query_attempts", thrift.BOOL, 3); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field begin error 3:include_query_attempts: ", p), err)
-		}
-		if err := oprot.WriteBool(ctx, bool(p.IncludeQueryAttempts)); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T.include_query_attempts (3) field write error: ", p), err)
-		}
-		if err := oprot.WriteFieldEnd(ctx); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field end error 3:include_query_attempts: ", p), err)
-		}
-	}
-	return err
-}
-
-func (p *TGetExecSummaryReq) Equals(other *TGetExecSummaryReq) bool {
-	if p == other {
-		return true
-	} else if p == nil || other == nil {
-		return false
-	}
-	if !p.OperationHandle.Equals(other.OperationHandle) { return false }
-	if !p.SessionHandle.Equals(other.SessionHandle) { return false }
-	if p.IncludeQueryAttempts != other.IncludeQueryAttempts { return false }
-	return true
-}
-
-func (p *TGetExecSummaryReq) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("TGetExecSummaryReq(%+v)", *p)
-}
-
-func (p *TGetExecSummaryReq) LogValue() slog.Value {
-	if p == nil {
-		return slog.AnyValue(nil)
-	}
-	v := thrift.SlogTStructWrapper{
-		Type: "*impalaservice.TGetExecSummaryReq",
-		Value: p,
-	}
-	return slog.AnyValue(v)
-}
-
-var _ slog.LogValuer = (*TGetExecSummaryReq)(nil)
-
-func (p *TGetExecSummaryReq) Validate() error {
-	return nil
-}
-
-// Attributes:
-//  - Status
-//  - Summary
-//  - FailedSummaries
-// 
-type TGetExecSummaryResp struct {
-	Status *cli_service.TStatus `thrift:"status,1,required" db:"status" json:"status"`
-	Summary *execstats.TExecSummary `thrift:"summary,2" db:"summary" json:"summary,omitempty"`
-	FailedSummaries []*execstats.TExecSummary `thrift:"failed_summaries,3" db:"failed_summaries" json:"failed_summaries,omitempty"`
-}
-
-func NewTGetExecSummaryResp() *TGetExecSummaryResp {
-	return &TGetExecSummaryResp{}
-}
-
-var TGetExecSummaryResp_Status_DEFAULT *cli_service.TStatus
-
-func (p *TGetExecSummaryResp) GetStatus() *cli_service.TStatus {
-	if !p.IsSetStatus() {
-		return TGetExecSummaryResp_Status_DEFAULT
-	}
-	return p.Status
-}
-
-var TGetExecSummaryResp_Summary_DEFAULT *execstats.TExecSummary
-
-func (p *TGetExecSummaryResp) GetSummary() *execstats.TExecSummary {
-	if !p.IsSetSummary() {
-		return TGetExecSummaryResp_Summary_DEFAULT
-	}
-	return p.Summary
-}
-
-var TGetExecSummaryResp_FailedSummaries_DEFAULT []*execstats.TExecSummary
-
-
-func (p *TGetExecSummaryResp) GetFailedSummaries() []*execstats.TExecSummary {
-	return p.FailedSummaries
-}
-
-func (p *TGetExecSummaryResp) IsSetStatus() bool {
-	return p.Status != nil
-}
-
-func (p *TGetExecSummaryResp) IsSetSummary() bool {
-	return p.Summary != nil
-}
-
-func (p *TGetExecSummaryResp) IsSetFailedSummaries() bool {
-	return p.FailedSummaries != nil
-}
-
-func (p *TGetExecSummaryResp) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	if _, err := iprot.ReadStructBegin(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
-	}
-
-	var issetStatus bool = false;
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
-		}
-		if fieldTypeId == thrift.STOP {
-			break
-		}
-		switch fieldId {
-		case 1:
-			if fieldTypeId == thrift.STRUCT {
-				if err := p.ReadField1(ctx, iprot); err != nil {
-					return err
-				}
-				issetStatus = true
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		case 2:
-			if fieldTypeId == thrift.STRUCT {
-				if err := p.ReadField2(ctx, iprot); err != nil {
-					return err
-				}
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		case 3:
-			if fieldTypeId == thrift.LIST {
-				if err := p.ReadField3(ctx, iprot); err != nil {
-					return err
-				}
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		default:
-			if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-				return err
-			}
-		}
-		if err := iprot.ReadFieldEnd(ctx); err != nil {
-			return err
-		}
-	}
-	if err := iprot.ReadStructEnd(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-	}
-	if !issetStatus{
-		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("Required field Status is not set"))
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryResp) ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
-	p.Status = &cli_service.TStatus{}
-	if err := p.Status.Read(ctx, iprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Status), err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryResp) ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
-	p.Summary = &execstats.TExecSummary{}
-	if err := p.Summary.Read(ctx, iprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Summary), err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryResp) ReadField3(ctx context.Context, iprot thrift.TProtocol) error {
-	_, size, err := iprot.ReadListBegin(ctx)
-	if err != nil {
-		return thrift.PrependError("error reading list begin: ", err)
-	}
-	tSlice := make([]*execstats.TExecSummary, 0, size)
-	p.FailedSummaries = tSlice
-	for i := 0; i < size; i++ {
-		_elem6 := &execstats.TExecSummary{}
-		if err := _elem6.Read(ctx, iprot); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", _elem6), err)
-		}
-		p.FailedSummaries = append(p.FailedSummaries, _elem6)
-	}
-	if err := iprot.ReadListEnd(ctx); err != nil {
-		return thrift.PrependError("error reading list end: ", err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryResp) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	if err := oprot.WriteStructBegin(ctx, "TGetExecSummaryResp"); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
-	}
-	if p != nil {
-		if err := p.writeField1(ctx, oprot); err != nil { return err }
-		if err := p.writeField2(ctx, oprot); err != nil { return err }
-		if err := p.writeField3(ctx, oprot); err != nil { return err }
-	}
-	if err := oprot.WriteFieldStop(ctx); err != nil {
-		return thrift.PrependError("write field stop error: ", err)
-	}
-	if err := oprot.WriteStructEnd(ctx); err != nil {
-		return thrift.PrependError("write struct stop error: ", err)
-	}
-	return nil
-}
-
-func (p *TGetExecSummaryResp) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if err := oprot.WriteFieldBegin(ctx, "status", thrift.STRUCT, 1); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:status: ", p), err)
-	}
-	if err := p.Status.Write(ctx, oprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Status), err)
-	}
-	if err := oprot.WriteFieldEnd(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field end error 1:status: ", p), err)
-	}
-	return err
-}
-
-func (p *TGetExecSummaryResp) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if p.IsSetSummary() {
-		if err := oprot.WriteFieldBegin(ctx, "summary", thrift.STRUCT, 2); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:summary: ", p), err)
-		}
-		if err := p.Summary.Write(ctx, oprot); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Summary), err)
-		}
-		if err := oprot.WriteFieldEnd(ctx); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field end error 2:summary: ", p), err)
-		}
-	}
-	return err
-}
-
-func (p *TGetExecSummaryResp) writeField3(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if p.IsSetFailedSummaries() {
-		if err := oprot.WriteFieldBegin(ctx, "failed_summaries", thrift.LIST, 3); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field begin error 3:failed_summaries: ", p), err)
-		}
-		if err := oprot.WriteListBegin(ctx, thrift.STRUCT, len(p.FailedSummaries)); err != nil {
-			return thrift.PrependError("error writing list begin: ", err)
-		}
-		for _, v := range p.FailedSummaries {
-			if err := v.Write(ctx, oprot); err != nil {
-				return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", v), err)
-			}
-		}
-		if err := oprot.WriteListEnd(ctx); err != nil {
-			return thrift.PrependError("error writing list end: ", err)
-		}
-		if err := oprot.WriteFieldEnd(ctx); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field end error 3:failed_summaries: ", p), err)
-		}
-	}
-	return err
-}
-
-func (p *TGetExecSummaryResp) Equals(other *TGetExecSummaryResp) bool {
-	if p == other {
-		return true
-	} else if p == nil || other == nil {
-		return false
-	}
-	if !p.Status.Equals(other.Status) { return false }
-	if !p.Summary.Equals(other.Summary) { return false }
-	if len(p.FailedSummaries) != len(other.FailedSummaries) { return false }
-	for i, _tgt := range p.FailedSummaries {
-		_src7 := other.FailedSummaries[i]
-		if !_tgt.Equals(_src7) { return false }
-	}
-	return true
-}
-
-func (p *TGetExecSummaryResp) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("TGetExecSummaryResp(%+v)", *p)
-}
-
-func (p *TGetExecSummaryResp) LogValue() slog.Value {
-	if p == nil {
-		return slog.AnyValue(nil)
-	}
-	v := thrift.SlogTStructWrapper{
-		Type: "*impalaservice.TGetExecSummaryResp",
-		Value: p,
-	}
-	return slog.AnyValue(v)
-}
-
-var _ slog.LogValuer = (*TGetExecSummaryResp)(nil)
-
-func (p *TGetExecSummaryResp) Validate() error {
-	return nil
-}
-
 type ImpalaHiveServer2Service interface {
 	cli_service.TCLIService
 
-	// Parameters:
-	//  - Req
-	// 
-	GetExecSummary(ctx context.Context, req *TGetExecSummaryReq) (_r *TGetExecSummaryResp, _err error)
 	// Parameters:
 	//  - Req
 	// 
@@ -2005,37 +1501,18 @@ func NewImpalaHiveServer2ServiceClient(c thrift.TClient) *ImpalaHiveServer2Servi
 // Parameters:
 //  - Req
 // 
-func (p *ImpalaHiveServer2ServiceClient) GetExecSummary(ctx context.Context, req *TGetExecSummaryReq) (_r *TGetExecSummaryResp, _err error) {
-	var _args8 ImpalaHiveServer2ServiceGetExecSummaryArgs
-	_args8.Req = req
-	var _result10 ImpalaHiveServer2ServiceGetExecSummaryResult
-	var _meta9 thrift.ResponseMeta
-	_meta9, _err = p.Client_().Call(ctx, "GetExecSummary", &_args8, &_result10)
-	p.SetLastResponseMeta_(_meta9)
-	if _err != nil {
-		return
-	}
-	if _ret11 := _result10.GetSuccess(); _ret11 != nil {
-		return _ret11, nil
-	}
-	return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "GetExecSummary failed: unknown result")
-}
-
-// Parameters:
-//  - Req
-// 
 func (p *ImpalaHiveServer2ServiceClient) PingImpalaHS2Service(ctx context.Context, req *TPingImpalaHS2ServiceReq) (_r *TPingImpalaHS2ServiceResp, _err error) {
-	var _args12 ImpalaHiveServer2ServicePingImpalaHS2ServiceArgs
-	_args12.Req = req
-	var _result14 ImpalaHiveServer2ServicePingImpalaHS2ServiceResult
-	var _meta13 thrift.ResponseMeta
-	_meta13, _err = p.Client_().Call(ctx, "PingImpalaHS2Service", &_args12, &_result14)
-	p.SetLastResponseMeta_(_meta13)
+	var _args6 ImpalaHiveServer2ServicePingImpalaHS2ServiceArgs
+	_args6.Req = req
+	var _result8 ImpalaHiveServer2ServicePingImpalaHS2ServiceResult
+	var _meta7 thrift.ResponseMeta
+	_meta7, _err = p.Client_().Call(ctx, "PingImpalaHS2Service", &_args6, &_result8)
+	p.SetLastResponseMeta_(_meta7)
 	if _err != nil {
 		return
 	}
-	if _ret15 := _result14.GetSuccess(); _ret15 != nil {
-		return _ret15, nil
+	if _ret9 := _result8.GetSuccess(); _ret9 != nil {
+		return _ret9, nil
 	}
 	return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "PingImpalaHS2Service failed: unknown result")
 }
@@ -2044,17 +1521,17 @@ func (p *ImpalaHiveServer2ServiceClient) PingImpalaHS2Service(ctx context.Contex
 //  - Req
 // 
 func (p *ImpalaHiveServer2ServiceClient) CloseImpalaOperation(ctx context.Context, req *TCloseImpalaOperationReq) (_r *TCloseImpalaOperationResp, _err error) {
-	var _args16 ImpalaHiveServer2ServiceCloseImpalaOperationArgs
-	_args16.Req = req
-	var _result18 ImpalaHiveServer2ServiceCloseImpalaOperationResult
-	var _meta17 thrift.ResponseMeta
-	_meta17, _err = p.Client_().Call(ctx, "CloseImpalaOperation", &_args16, &_result18)
-	p.SetLastResponseMeta_(_meta17)
+	var _args10 ImpalaHiveServer2ServiceCloseImpalaOperationArgs
+	_args10.Req = req
+	var _result12 ImpalaHiveServer2ServiceCloseImpalaOperationResult
+	var _meta11 thrift.ResponseMeta
+	_meta11, _err = p.Client_().Call(ctx, "CloseImpalaOperation", &_args10, &_result12)
+	p.SetLastResponseMeta_(_meta11)
 	if _err != nil {
 		return
 	}
-	if _ret19 := _result18.GetSuccess(); _ret19 != nil {
-		return _ret19, nil
+	if _ret13 := _result12.GetSuccess(); _ret13 != nil {
+		return _ret13, nil
 	}
 	return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "CloseImpalaOperation failed: unknown result")
 }
@@ -2064,118 +1541,10 @@ type ImpalaHiveServer2ServiceProcessor struct {
 }
 
 func NewImpalaHiveServer2ServiceProcessor(handler ImpalaHiveServer2Service) *ImpalaHiveServer2ServiceProcessor {
-	self20 := &ImpalaHiveServer2ServiceProcessor{cli_service.NewTCLIServiceProcessor(handler)}
-	self20.AddToProcessorMap("GetExecSummary", &impalaHiveServer2ServiceProcessorGetExecSummary{handler:handler})
-	self20.AddToProcessorMap("PingImpalaHS2Service", &impalaHiveServer2ServiceProcessorPingImpalaHS2Service{handler:handler})
-	self20.AddToProcessorMap("CloseImpalaOperation", &impalaHiveServer2ServiceProcessorCloseImpalaOperation{handler:handler})
-	return self20
-}
-
-type impalaHiveServer2ServiceProcessorGetExecSummary struct {
-	handler ImpalaHiveServer2Service
-}
-
-func (p *impalaHiveServer2ServiceProcessorGetExecSummary) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-	var _write_err21 thrift.TException
-	args := ImpalaHiveServer2ServiceGetExecSummaryArgs{}
-	if err2 := args.Read(ctx, iprot); err2 != nil {
-		iprot.ReadMessageEnd(ctx)
-		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err2.Error())
-		oprot.WriteMessageBegin(ctx, "GetExecSummary", thrift.EXCEPTION, seqId)
-		x.Write(ctx, oprot)
-		oprot.WriteMessageEnd(ctx)
-		oprot.Flush(ctx)
-		return false, thrift.WrapTException(err2)
-	}
-	iprot.ReadMessageEnd(ctx)
-
-	tickerCancel := func() {}
-	// Start a goroutine to do server side connectivity check.
-	if thrift.ServerConnectivityCheckInterval > 0 {
-		var cancel context.CancelCauseFunc
-		ctx, cancel = context.WithCancelCause(ctx)
-		defer cancel(nil)
-		var tickerCtx context.Context
-		tickerCtx, tickerCancel = context.WithCancel(context.Background())
-		defer tickerCancel()
-		go func(ctx context.Context, cancel context.CancelCauseFunc) {
-			ticker := time.NewTicker(thrift.ServerConnectivityCheckInterval)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					if !iprot.Transport().IsOpen() {
-						cancel(thrift.ErrAbandonRequest)
-						return
-					}
-				}
-			}
-		}(tickerCtx, cancel)
-	}
-
-	result := ImpalaHiveServer2ServiceGetExecSummaryResult{}
-	if retval, err2 := p.handler.GetExecSummary(ctx, args.Req); err2 != nil {
-		tickerCancel()
-		err = thrift.WrapTException(err2)
-		if errors.Is(err2, thrift.ErrAbandonRequest) {
-			return false, &thrift.ProcessorError{
-				WriteError:    thrift.WrapTException(err2),
-				EndpointError: err,
-			}
-		}
-		if errors.Is(err2, context.Canceled) {
-			if err3 := context.Cause(ctx); errors.Is(err3, thrift.ErrAbandonRequest) {
-				return false, &thrift.ProcessorError{
-					WriteError:    thrift.WrapTException(err3),
-					EndpointError: err,
-				}
-			}
-		}
-		_exc22 := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing GetExecSummary: " + err2.Error())
-		if err2 := oprot.WriteMessageBegin(ctx, "GetExecSummary", thrift.EXCEPTION, seqId); err2 != nil {
-			_write_err21 = thrift.WrapTException(err2)
-		}
-		if err2 := _exc22.Write(ctx, oprot); _write_err21 == nil && err2 != nil {
-			_write_err21 = thrift.WrapTException(err2)
-		}
-		if err2 := oprot.WriteMessageEnd(ctx); _write_err21 == nil && err2 != nil {
-			_write_err21 = thrift.WrapTException(err2)
-		}
-		if err2 := oprot.Flush(ctx); _write_err21 == nil && err2 != nil {
-			_write_err21 = thrift.WrapTException(err2)
-		}
-		if _write_err21 != nil {
-			return false, &thrift.ProcessorError{
-				WriteError:    _write_err21,
-				EndpointError: err,
-			}
-		}
-		return true, err
-	} else {
-		result.Success = retval
-	}
-	tickerCancel()
-	if err2 := oprot.WriteMessageBegin(ctx, "GetExecSummary", thrift.REPLY, seqId); err2 != nil {
-		_write_err21 = thrift.WrapTException(err2)
-	}
-	if err2 := result.Write(ctx, oprot); _write_err21 == nil && err2 != nil {
-		_write_err21 = thrift.WrapTException(err2)
-	}
-	if err2 := oprot.WriteMessageEnd(ctx); _write_err21 == nil && err2 != nil {
-		_write_err21 = thrift.WrapTException(err2)
-	}
-	if err2 := oprot.Flush(ctx); _write_err21 == nil && err2 != nil {
-		_write_err21 = thrift.WrapTException(err2)
-	}
-	if _write_err21 != nil {
-		return false, &thrift.ProcessorError{
-			WriteError:    _write_err21,
-			EndpointError: err,
-		}
-	}
-	return true, err
+	self14 := &ImpalaHiveServer2ServiceProcessor{cli_service.NewTCLIServiceProcessor(handler)}
+	self14.AddToProcessorMap("PingImpalaHS2Service", &impalaHiveServer2ServiceProcessorPingImpalaHS2Service{handler:handler})
+	self14.AddToProcessorMap("CloseImpalaOperation", &impalaHiveServer2ServiceProcessorCloseImpalaOperation{handler:handler})
+	return self14
 }
 
 type impalaHiveServer2ServiceProcessorPingImpalaHS2Service struct {
@@ -2183,7 +1552,7 @@ type impalaHiveServer2ServiceProcessorPingImpalaHS2Service struct {
 }
 
 func (p *impalaHiveServer2ServiceProcessorPingImpalaHS2Service) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-	var _write_err23 thrift.TException
+	var _write_err15 thrift.TException
 	args := ImpalaHiveServer2ServicePingImpalaHS2ServiceArgs{}
 	if err2 := args.Read(ctx, iprot); err2 != nil {
 		iprot.ReadMessageEnd(ctx)
@@ -2240,22 +1609,22 @@ func (p *impalaHiveServer2ServiceProcessorPingImpalaHS2Service) Process(ctx cont
 				}
 			}
 		}
-		_exc24 := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing PingImpalaHS2Service: " + err2.Error())
+		_exc16 := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing PingImpalaHS2Service: " + err2.Error())
 		if err2 := oprot.WriteMessageBegin(ctx, "PingImpalaHS2Service", thrift.EXCEPTION, seqId); err2 != nil {
-			_write_err23 = thrift.WrapTException(err2)
+			_write_err15 = thrift.WrapTException(err2)
 		}
-		if err2 := _exc24.Write(ctx, oprot); _write_err23 == nil && err2 != nil {
-			_write_err23 = thrift.WrapTException(err2)
+		if err2 := _exc16.Write(ctx, oprot); _write_err15 == nil && err2 != nil {
+			_write_err15 = thrift.WrapTException(err2)
 		}
-		if err2 := oprot.WriteMessageEnd(ctx); _write_err23 == nil && err2 != nil {
-			_write_err23 = thrift.WrapTException(err2)
+		if err2 := oprot.WriteMessageEnd(ctx); _write_err15 == nil && err2 != nil {
+			_write_err15 = thrift.WrapTException(err2)
 		}
-		if err2 := oprot.Flush(ctx); _write_err23 == nil && err2 != nil {
-			_write_err23 = thrift.WrapTException(err2)
+		if err2 := oprot.Flush(ctx); _write_err15 == nil && err2 != nil {
+			_write_err15 = thrift.WrapTException(err2)
 		}
-		if _write_err23 != nil {
+		if _write_err15 != nil {
 			return false, &thrift.ProcessorError{
-				WriteError:    _write_err23,
+				WriteError:    _write_err15,
 				EndpointError: err,
 			}
 		}
@@ -2265,20 +1634,20 @@ func (p *impalaHiveServer2ServiceProcessorPingImpalaHS2Service) Process(ctx cont
 	}
 	tickerCancel()
 	if err2 := oprot.WriteMessageBegin(ctx, "PingImpalaHS2Service", thrift.REPLY, seqId); err2 != nil {
-		_write_err23 = thrift.WrapTException(err2)
+		_write_err15 = thrift.WrapTException(err2)
 	}
-	if err2 := result.Write(ctx, oprot); _write_err23 == nil && err2 != nil {
-		_write_err23 = thrift.WrapTException(err2)
+	if err2 := result.Write(ctx, oprot); _write_err15 == nil && err2 != nil {
+		_write_err15 = thrift.WrapTException(err2)
 	}
-	if err2 := oprot.WriteMessageEnd(ctx); _write_err23 == nil && err2 != nil {
-		_write_err23 = thrift.WrapTException(err2)
+	if err2 := oprot.WriteMessageEnd(ctx); _write_err15 == nil && err2 != nil {
+		_write_err15 = thrift.WrapTException(err2)
 	}
-	if err2 := oprot.Flush(ctx); _write_err23 == nil && err2 != nil {
-		_write_err23 = thrift.WrapTException(err2)
+	if err2 := oprot.Flush(ctx); _write_err15 == nil && err2 != nil {
+		_write_err15 = thrift.WrapTException(err2)
 	}
-	if _write_err23 != nil {
+	if _write_err15 != nil {
 		return false, &thrift.ProcessorError{
-			WriteError:    _write_err23,
+			WriteError:    _write_err15,
 			EndpointError: err,
 		}
 	}
@@ -2290,7 +1659,7 @@ type impalaHiveServer2ServiceProcessorCloseImpalaOperation struct {
 }
 
 func (p *impalaHiveServer2ServiceProcessorCloseImpalaOperation) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-	var _write_err25 thrift.TException
+	var _write_err17 thrift.TException
 	args := ImpalaHiveServer2ServiceCloseImpalaOperationArgs{}
 	if err2 := args.Read(ctx, iprot); err2 != nil {
 		iprot.ReadMessageEnd(ctx)
@@ -2347,22 +1716,22 @@ func (p *impalaHiveServer2ServiceProcessorCloseImpalaOperation) Process(ctx cont
 				}
 			}
 		}
-		_exc26 := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing CloseImpalaOperation: " + err2.Error())
+		_exc18 := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing CloseImpalaOperation: " + err2.Error())
 		if err2 := oprot.WriteMessageBegin(ctx, "CloseImpalaOperation", thrift.EXCEPTION, seqId); err2 != nil {
-			_write_err25 = thrift.WrapTException(err2)
+			_write_err17 = thrift.WrapTException(err2)
 		}
-		if err2 := _exc26.Write(ctx, oprot); _write_err25 == nil && err2 != nil {
-			_write_err25 = thrift.WrapTException(err2)
+		if err2 := _exc18.Write(ctx, oprot); _write_err17 == nil && err2 != nil {
+			_write_err17 = thrift.WrapTException(err2)
 		}
-		if err2 := oprot.WriteMessageEnd(ctx); _write_err25 == nil && err2 != nil {
-			_write_err25 = thrift.WrapTException(err2)
+		if err2 := oprot.WriteMessageEnd(ctx); _write_err17 == nil && err2 != nil {
+			_write_err17 = thrift.WrapTException(err2)
 		}
-		if err2 := oprot.Flush(ctx); _write_err25 == nil && err2 != nil {
-			_write_err25 = thrift.WrapTException(err2)
+		if err2 := oprot.Flush(ctx); _write_err17 == nil && err2 != nil {
+			_write_err17 = thrift.WrapTException(err2)
 		}
-		if _write_err25 != nil {
+		if _write_err17 != nil {
 			return false, &thrift.ProcessorError{
-				WriteError:    _write_err25,
+				WriteError:    _write_err17,
 				EndpointError: err,
 			}
 		}
@@ -2372,20 +1741,20 @@ func (p *impalaHiveServer2ServiceProcessorCloseImpalaOperation) Process(ctx cont
 	}
 	tickerCancel()
 	if err2 := oprot.WriteMessageBegin(ctx, "CloseImpalaOperation", thrift.REPLY, seqId); err2 != nil {
-		_write_err25 = thrift.WrapTException(err2)
+		_write_err17 = thrift.WrapTException(err2)
 	}
-	if err2 := result.Write(ctx, oprot); _write_err25 == nil && err2 != nil {
-		_write_err25 = thrift.WrapTException(err2)
+	if err2 := result.Write(ctx, oprot); _write_err17 == nil && err2 != nil {
+		_write_err17 = thrift.WrapTException(err2)
 	}
-	if err2 := oprot.WriteMessageEnd(ctx); _write_err25 == nil && err2 != nil {
-		_write_err25 = thrift.WrapTException(err2)
+	if err2 := oprot.WriteMessageEnd(ctx); _write_err17 == nil && err2 != nil {
+		_write_err17 = thrift.WrapTException(err2)
 	}
-	if err2 := oprot.Flush(ctx); _write_err25 == nil && err2 != nil {
-		_write_err25 = thrift.WrapTException(err2)
+	if err2 := oprot.Flush(ctx); _write_err17 == nil && err2 != nil {
+		_write_err17 = thrift.WrapTException(err2)
 	}
-	if _write_err25 != nil {
+	if _write_err17 != nil {
 		return false, &thrift.ProcessorError{
-			WriteError:    _write_err25,
+			WriteError:    _write_err17,
 			EndpointError: err,
 		}
 	}
@@ -2394,250 +1763,6 @@ func (p *impalaHiveServer2ServiceProcessorCloseImpalaOperation) Process(ctx cont
 
 
 // HELPER FUNCTIONS AND STRUCTURES
-
-// Attributes:
-//  - Req
-// 
-type ImpalaHiveServer2ServiceGetExecSummaryArgs struct {
-	Req *TGetExecSummaryReq `thrift:"req,1" db:"req" json:"req"`
-}
-
-func NewImpalaHiveServer2ServiceGetExecSummaryArgs() *ImpalaHiveServer2ServiceGetExecSummaryArgs {
-	return &ImpalaHiveServer2ServiceGetExecSummaryArgs{}
-}
-
-var ImpalaHiveServer2ServiceGetExecSummaryArgs_Req_DEFAULT *TGetExecSummaryReq
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) GetReq() *TGetExecSummaryReq {
-	if !p.IsSetReq() {
-		return ImpalaHiveServer2ServiceGetExecSummaryArgs_Req_DEFAULT
-	}
-	return p.Req
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) IsSetReq() bool {
-	return p.Req != nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	if _, err := iprot.ReadStructBegin(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
-	}
-
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
-		}
-		if fieldTypeId == thrift.STOP {
-			break
-		}
-		switch fieldId {
-		case 1:
-			if fieldTypeId == thrift.STRUCT {
-				if err := p.ReadField1(ctx, iprot); err != nil {
-					return err
-				}
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		default:
-			if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-				return err
-			}
-		}
-		if err := iprot.ReadFieldEnd(ctx); err != nil {
-			return err
-		}
-	}
-	if err := iprot.ReadStructEnd(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-	}
-	return nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
-	p.Req = &TGetExecSummaryReq{}
-	if err := p.Req.Read(ctx, iprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Req), err)
-	}
-	return nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	if err := oprot.WriteStructBegin(ctx, "GetExecSummary_args"); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
-	}
-	if p != nil {
-		if err := p.writeField1(ctx, oprot); err != nil { return err }
-	}
-	if err := oprot.WriteFieldStop(ctx); err != nil {
-		return thrift.PrependError("write field stop error: ", err)
-	}
-	if err := oprot.WriteStructEnd(ctx); err != nil {
-		return thrift.PrependError("write struct stop error: ", err)
-	}
-	return nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if err := oprot.WriteFieldBegin(ctx, "req", thrift.STRUCT, 1); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:req: ", p), err)
-	}
-	if err := p.Req.Write(ctx, oprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Req), err)
-	}
-	if err := oprot.WriteFieldEnd(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field end error 1:req: ", p), err)
-	}
-	return err
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("ImpalaHiveServer2ServiceGetExecSummaryArgs(%+v)", *p)
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryArgs) LogValue() slog.Value {
-	if p == nil {
-		return slog.AnyValue(nil)
-	}
-	v := thrift.SlogTStructWrapper{
-		Type: "*impalaservice.ImpalaHiveServer2ServiceGetExecSummaryArgs",
-		Value: p,
-	}
-	return slog.AnyValue(v)
-}
-
-var _ slog.LogValuer = (*ImpalaHiveServer2ServiceGetExecSummaryArgs)(nil)
-
-// Attributes:
-//  - Success
-// 
-type ImpalaHiveServer2ServiceGetExecSummaryResult struct {
-	Success *TGetExecSummaryResp `thrift:"success,0" db:"success" json:"success,omitempty"`
-}
-
-func NewImpalaHiveServer2ServiceGetExecSummaryResult() *ImpalaHiveServer2ServiceGetExecSummaryResult {
-	return &ImpalaHiveServer2ServiceGetExecSummaryResult{}
-}
-
-var ImpalaHiveServer2ServiceGetExecSummaryResult_Success_DEFAULT *TGetExecSummaryResp
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) GetSuccess() *TGetExecSummaryResp {
-	if !p.IsSetSuccess() {
-		return ImpalaHiveServer2ServiceGetExecSummaryResult_Success_DEFAULT
-	}
-	return p.Success
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	if _, err := iprot.ReadStructBegin(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
-	}
-
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
-		}
-		if fieldTypeId == thrift.STOP {
-			break
-		}
-		switch fieldId {
-		case 0:
-			if fieldTypeId == thrift.STRUCT {
-				if err := p.ReadField0(ctx, iprot); err != nil {
-					return err
-				}
-			} else {
-				if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-					return err
-				}
-			}
-		default:
-			if err := iprot.Skip(ctx, fieldTypeId); err != nil {
-				return err
-			}
-		}
-		if err := iprot.ReadFieldEnd(ctx); err != nil {
-			return err
-		}
-	}
-	if err := iprot.ReadStructEnd(ctx); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-	}
-	return nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
-	p.Success = &TGetExecSummaryResp{}
-	if err := p.Success.Read(ctx, iprot); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
-	}
-	return nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	if err := oprot.WriteStructBegin(ctx, "GetExecSummary_result"); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
-	}
-	if p != nil {
-		if err := p.writeField0(ctx, oprot); err != nil { return err }
-	}
-	if err := oprot.WriteFieldStop(ctx); err != nil {
-		return thrift.PrependError("write field stop error: ", err)
-	}
-	if err := oprot.WriteStructEnd(ctx); err != nil {
-		return thrift.PrependError("write struct stop error: ", err)
-	}
-	return nil
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
-	if p.IsSetSuccess() {
-		if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err)
-		}
-		if err := p.Success.Write(ctx, oprot); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Success), err)
-		}
-		if err := oprot.WriteFieldEnd(ctx); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field end error 0:success: ", p), err)
-		}
-	}
-	return err
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("ImpalaHiveServer2ServiceGetExecSummaryResult(%+v)", *p)
-}
-
-func (p *ImpalaHiveServer2ServiceGetExecSummaryResult) LogValue() slog.Value {
-	if p == nil {
-		return slog.AnyValue(nil)
-	}
-	v := thrift.SlogTStructWrapper{
-		Type: "*impalaservice.ImpalaHiveServer2ServiceGetExecSummaryResult",
-		Value: p,
-	}
-	return slog.AnyValue(v)
-}
-
-var _ slog.LogValuer = (*ImpalaHiveServer2ServiceGetExecSummaryResult)(nil)
 
 // Attributes:
 //  - Req
