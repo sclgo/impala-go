@@ -19,9 +19,12 @@ type Options struct {
 	Username string
 	Password string
 
-	UseLDAP    bool
-	UseTLS     bool
-	CACertPath string
+	UseLDAP bool
+
+	UseTLS                bool
+	CACertPath            string
+	TLSInsecureSkipVerify bool
+
 	BufferSize int
 	BatchSize  int
 

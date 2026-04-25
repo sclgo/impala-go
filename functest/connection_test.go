@@ -263,6 +263,19 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 		require.ErrorAs(t, err, &expectedErrorType)
 	})
 
+	t.Run("insecure", func(t *testing.T) {
+		noCertsDsnUrl, err := url.Parse(dsn)
+		require.NoError(t, err)
+		query := noCertsDsnUrl.Query()
+		query.Del("ca-cert")
+		query.Add("tlsInsecureSkipVerify", "true")
+		noCertsDsnUrl.RawQuery = query.Encode()
+		insecureTlsDb := fi.NoError(sql.Open("impala", noCertsDsnUrl.String())).Require(t)
+		defer fi.NoErrorF(insecureTlsDb.Close, t)
+		err = insecureTlsDb.Ping()
+		require.NoError(t, err)
+	})
+
 	t.Run("bad password", func(t *testing.T) {
 		badPassDsn, err := url.Parse(dsn)
 		require.NoError(t, err)

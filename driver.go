@@ -99,18 +99,21 @@ func parseURI(uri string) (*Options, error) {
 		opts.UseLDAP = true
 	}
 
-	useTls, ok := query["tls"]
-	if ok {
-		v, err := strconv.ParseBool(useTls[0])
-		if err != nil {
-			return nil, fmt.Errorf("invalid tls value: %w", err)
-		}
-		opts.UseTLS = v
+	err = parseFlag(query, "tls", &opts.UseTLS)
+	if err != nil {
+		return nil, err
 	}
 
 	caCert, ok := query["ca-cert"]
 	if ok {
 		opts.CACertPath = caCert[0]
+	}
+
+	if opts.UseTLS {
+		err = parseFlag(query, "tlsInsecureSkipVerify", &opts.TLSInsecureSkipVerify)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = parseIntKey(query, "batch-size", &opts.BatchSize)
@@ -151,6 +154,19 @@ func parseURI(uri string) (*Options, error) {
 	}
 
 	return &opts, nil
+}
+
+func parseFlag(query url.Values, key string, dest *bool) error {
+	values, ok := query[key]
+	if ok {
+		val := values[0]
+		v, err := strconv.ParseBool(val)
+		if err != nil {
+			return fmt.Errorf("invalid %s value: %s - %w", key, val, err)
+		}
+		*dest = v
+	}
+	return nil
 }
 
 func parseDurationKey(query url.Values, key string, target *time.Duration) (err error) {
@@ -238,7 +254,9 @@ func configureTransport(opts *Options) (thrift.TTransport, *tls.Config, error) {
 	var tlsConf *tls.Config
 	if opts.UseTLS {
 
-		tlsConf = &tls.Config{}
+		tlsConf = &tls.Config{
+			InsecureSkipVerify: opts.TLSInsecureSkipVerify,
+		}
 		if certPath := opts.CACertPath; certPath != "" {
 			caCertPool, err := readCert(certPath)
 			if err != nil {
