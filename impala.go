@@ -19,9 +19,15 @@ type Options struct {
 	Username string
 	Password string
 
-	UseLDAP    bool
+	UseLDAP bool
+
 	UseTLS     bool
 	CACertPath string
+
+	// TlsInsecureSkipVerify configures the tls.Config InsecureSkipVerify flag for
+	// a TLS connection to Impala. Behaves the same way as AllowSelfSignedCerts in the official JDBC driver.
+	TLSInsecureSkipVerify bool
+
 	BufferSize int
 	BatchSize  int
 
