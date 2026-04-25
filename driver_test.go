@@ -47,7 +47,7 @@ func TestParseURI(t *testing.T) {
 			Options{Host: "localhost", UseTLS: true, CACertPath: "/etc/ca.crt"},
 		},
 		{
-			"impala://localhost?tls=true&tlsInsecureSkipVerify=true",
+			"impala://localhost?tls=true&tls-insecure-skip-verify=true",
 			Options{Host: "localhost", UseTLS: true, TLSInsecureSkipVerify: true},
 		},
 		{

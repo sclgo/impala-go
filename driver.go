@@ -99,18 +99,18 @@ func parseURI(uri string) (*Options, error) {
 		opts.UseLDAP = true
 	}
 
-	err = parseFlag(query, "tls", &opts.UseTLS)
+	err = parseBoolKey(query, "tls", &opts.UseTLS)
 	if err != nil {
 		return nil, err
 	}
 
-	caCert, ok := query["ca-cert"]
-	if ok {
-		opts.CACertPath = caCert[0]
-	}
-
 	if opts.UseTLS {
-		err = parseFlag(query, "tlsInsecureSkipVerify", &opts.TLSInsecureSkipVerify)
+		caCert, ok := query["ca-cert"]
+		if ok {
+			opts.CACertPath = caCert[0]
+		}
+
+		err = parseBoolKey(query, "tls-insecure-skip-verify", &opts.TLSInsecureSkipVerify)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +156,7 @@ func parseURI(uri string) (*Options, error) {
 	return &opts, nil
 }
 
-func parseFlag(query url.Values, key string, dest *bool) error {
+func parseBoolKey(query url.Values, key string, dest *bool) error {
 	values, ok := query[key]
 	if ok {
 		val := values[0]

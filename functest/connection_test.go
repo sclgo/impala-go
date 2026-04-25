@@ -268,7 +268,7 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 		require.NoError(t, err)
 		query := noCertsDsnUrl.Query()
 		query.Del("ca-cert")
-		query.Add("tlsInsecureSkipVerify", "true")
+		query.Add("tls-insecure-skip-verify", "true")
 		noCertsDsnUrl.RawQuery = query.Encode()
 		insecureTlsDb := fi.NoError(sql.Open("impala", noCertsDsnUrl.String())).Require(t)
 		defer fi.NoErrorF(insecureTlsDb.Close, t)
