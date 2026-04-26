@@ -49,6 +49,9 @@ Driver name is `impala`.
 * `connect-timeout` - integer or string value (default: 10s) - the max wait for initial connection to server, 
   expressed as a  time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an 
   integer without a time unit, milliseconds are assumed.
+* `tls-insecure-skip-verify` - disables TLS certificate verification by enabling the 
+  [tls.Config.InsecureSkipVerify](https://pkg.go.dev/crypto/tls#Config.InsecureSkipVerify) option.
+  Behaves the same way as `AllowSelfSignedCerts` in the official JDBC driver.
 
 A string of this format can be constructed using the URL type in the net/url package.
 
