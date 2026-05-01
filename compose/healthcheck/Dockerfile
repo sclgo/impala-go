@@ -1,4 +1,4 @@
-FROM ubuntu:oracular
+FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y zip unzip curl
 ADD https://github.com/Esri/gis-tools-for-hadoop/raw/c5d4942d4e/samples/lib/esri-geometry-api.jar /esri-geometry-api.jar
 ADD https://github.com/Esri/gis-tools-for-hadoop/raw/c5d4942d4e/samples/lib/spatial-sdk-hadoop.jar /spatial-sdk-hadoop.jar

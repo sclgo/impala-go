@@ -54,7 +54,7 @@ func (c *Client) OpenSession(ctx context.Context) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatus(resp); err != nil {
+	if err = checkStatus(resp); err != nil {
 		return nil, err
 	}
 

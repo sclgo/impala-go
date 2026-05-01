@@ -5,12 +5,10 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/murfffi/gorich/helperr"
 	"github.com/sclgo/impala-go/internal/hive"
 )
 
@@ -19,39 +17,48 @@ var (
 	ErrNotSupported = errors.New("impala: not supported")
 )
 
-// Conn to impala. It is not used concurrently by multiple goroutines.
+// Conn to impala. It should not be used concurrently by multiple goroutines.
 type Conn struct {
-	transportCloser io.Closer
-	session         *hive.Session
-	client          *hive.Client
-	log             *log.Logger
+	transport thrift.TTransport // we use two methods: Close and IsOpen atm, make a dedicated iface if needed
+	session   *hive.Session
+	client    *hive.Client
+	log       *log.Logger
 }
+
+// This declaration lists and verifies driver interfaces implemented by *Conn
+var _ interface {
+	driver.Conn
+	driver.Pinger
+	driver.NamedValueChecker
+	driver.ConnPrepareContext
+	driver.QueryerContext
+	driver.ExecerContext
+	driver.SessionResetter
+	driver.Validator
+} = (*Conn)(nil)
 
 // Ping impala server
 // Implements driver.Pinger
 func (c *Conn) Ping(ctx context.Context) error {
-	session, err := c.OpenSession(ctx)
-	// returns err with ErrBadConn in chain if session is not already open and open fails
+	session, err := c.OpenSession(ctx) // also validates transport; err has driver.ErrBadConn in chain
 	if err != nil {
 		return err
 	}
 
-	err = session.Ping(ctx)
+	return mapErr(session.Ping(ctx))
+}
 
-	// Looking at go stdlib code, it seems that both "broken pipe" and "reset" are not
-	// specific error instances, so they can be checked only by message.
-	// Possibly, the reason is that those messages come from the OS.
-	if helperr.ContainsAny(err, "broken pipe", "connection reset by peer") {
-		err = fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
-	}
-	// There can be other similar cases, but driver.ErrBadConn and Ping specs require us
-	// to only return it in chain if we are certain.
-	return err
+// isTransportOpen checks if the underlying connection is open without doing a roundtrip
+// and without blocking on IO. It can be used in cases where Ping will be too slow or unnecessary.
+func (c *Conn) isTransportOpen() bool {
+	// thrift implements that with a non-blocking peek of a byte over the socket
+	return c.transport.IsOpen()
 }
 
 // CheckNamedValue is called before passing arguments to the driver
 // and is called in place of any ColumnConverter. CheckNamedValue must do type
 // validation and conversion as appropriate for the driver.
+// Implements driver.NamedValueChecker
 func (c *Conn) CheckNamedValue(val *driver.NamedValue) error {
 	t, ok := val.Value.(time.Time)
 	if ok {
@@ -79,27 +86,29 @@ func (c *Conn) PrepareContext(_ context.Context, query string) (driver.Stmt, err
 // QueryContext executes a query that may return rows
 // Implements driver.QueryerContext
 func (c *Conn) QueryContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Rows, error) {
-	session, err := c.OpenSession(ctx)
+	session, err := c.OpenSession(ctx) // also validates transport; err has driver.ErrBadConn in chain
 	if err != nil {
 		return nil, err
 	}
 
 	tmpl := template(q)
 	stmt := statement(tmpl, args)
-	return query(ctx, session, stmt)
+	rows, err := query(ctx, session, stmt)
+	return rows, mapErr(err)
 }
 
 // ExecContext executes a query that doesn't return rows
 // Implements driver.ExecerContext
 func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Result, error) {
-	session, err := c.OpenSession(ctx)
+	session, err := c.OpenSession(ctx) // also validates transport; err has driver.ErrBadConn in chain
 	if err != nil {
 		return nil, err
 	}
 
 	tmpl := template(q)
 	stmt := statement(tmpl, args)
-	return exec(ctx, session, stmt)
+	res, err := exec(ctx, session, stmt)
+	return res, mapErr(err)
 }
 
 // Begin is not supported
@@ -108,15 +117,24 @@ func (c *Conn) Begin() (driver.Tx, error) {
 	return nil, ErrNotSupported
 }
 
-// OpenSession ensure opened session
+// OpenSession ensures opened session and live transport connection
+// Any returned errors have driver.ErrBadConn in the chain
 func (c *Conn) OpenSession(ctx context.Context) (*hive.Session, error) {
 	if c.session == nil {
 		session, err := c.client.OpenSession(ctx)
 		if err != nil {
-			c.log.Printf("failed to open session: %v", err)
-			return nil, fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
+			err = fmt.Errorf("%w: failed to open session: %v", driver.ErrBadConn, err)
+			c.log.Println(err)
+			return nil, err
 		}
 		c.session = session
+	} else {
+		// since we are just about to reuse the existing session, quickly check if the transport is still open,
+		// so we can return an error that database/sql/DB.retry can handle
+		// This check is on the hot path before any query so if it turns out to be too expensive it should be disabled.
+		if !c.isTransportOpen() {
+			return nil, fmt.Errorf("%w: underlying connection is not open", driver.ErrBadConn)
+		}
 	}
 	return c.session, nil
 }
@@ -126,6 +144,15 @@ func (c *Conn) OpenSession(ctx context.Context) (*hive.Session, error) {
 func (c *Conn) ResetSession(ctx context.Context) error {
 	if c.session != nil {
 		if err := c.session.Close(ctx); err != nil {
+			err = mapErr(err)
+
+			// database/sql uses ResetSession to validate a connection when taking it out of the pool,
+			// but it ignores errors other than ErrBadConn. As a precaution, we check again if the
+			// connection is open on the client, if we haven't mapped it to ErrBadConn already.
+
+			if !errors.Is(err, driver.ErrBadConn) && !c.isTransportOpen() {
+				err = fmt.Errorf("%w: underlying connection is not open after error %v while closing session", driver.ErrBadConn, err)
+			}
 			return err
 		}
 		c.session = nil
@@ -144,16 +171,26 @@ func (c *Conn) Close() error {
 		}
 	}
 
-	if err := c.transportCloser.Close(); err != nil {
+	if err := c.transport.Close(); err != nil {
 		return fmt.Errorf("failed to close underlying transport while closing connection: %w", err)
 	}
 	return nil
 }
 
+// IsValid checks that the connection is valid for use in database/sql
+// Implements driver.Validator
+// database/sql calls this before the connection is returned to the pool, after it has just been used.
+// In that case, running roundtrip validation like Ping is not worth the latency cost.
+// This method is reserved for use by database/sql only. Internal code should call isTransportOpen instead.
+// In the future, IsValid may do additional checks, not appropriate for other places isTransportOpen is called.
+func (c *Conn) IsValid() bool {
+	return c.isTransportOpen()
+}
+
 func NewConn(client *hive.Client, transport thrift.TTransport, logger *log.Logger) *Conn {
 	return &Conn{
-		transportCloser: transport,
-		client:          client,
-		log:             logger,
+		transport: transport,
+		client:    client,
+		log:       logger,
 	}
 }
