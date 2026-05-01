@@ -56,6 +56,12 @@ test: tools/ts
 lint: tools/golangci-lint
 	tools/golangci-lint run -v
 
+# NB: Fails with tinygo 0.41.1, latest as of 2026-05-01
+.PHONY: test-tinygo
+test-tinygo: # Checks if impala-go compiles with TinyGo
+	tinygo version
+	tinygo test -short ./...
+
 .PHONY: checks
 checks: check_changes check_deps check_tidy check_vuln check_modern
 
