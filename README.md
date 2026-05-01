@@ -212,8 +212,10 @@ on a best-effort basis.
 File any issues that you encounter as GitHub issues.
 
 The library is *not* compatible with [TinyGo](https://tinygo.org/) because
-Thrift for Go requires [tls.Listen](https://pkg.go.dev/crypto/tls#Listen) which is not implemented by TinyGo at this
-time.
+Thrift for Go doesn't support it. The Thrift code incompatible with TinyGo is not referenced by impala-go
+but compilation fails nonetheless. Last checked with `tinygo 0.41.1` and `Go 1.26` on `2026-05-01`.
+(Dev note: run `make test-tinygo` to check again.) Progress on TinyGo support is tracked by Thrift team at
+<https://issues.apache.org/jira/browse/THRIFT-5209>.
 
 ## Versioning
 
