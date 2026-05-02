@@ -113,6 +113,10 @@ func TestIntegration_Restart(t *testing.T) {
 	db := fi.NoError(sql.Open("impala", dsn)).Require(t)
 	defer helperr.CloseQuietly(db)
 
+	db2 := fi.NoError(sql.Open("impala", dsn)).Require(t)
+	defer helperr.CloseQuietly(db2)
+	db2.SetMaxIdleConns(1)
+
 	conn, err := db.Conn(ctx)
 	require.NoError(t, err)
 
@@ -121,8 +125,11 @@ func TestIntegration_Restart(t *testing.T) {
 	err = conn.PingContext(ctx)
 	require.NoError(t, err)
 
-	// ensure there is an open connection in the pool
+	// ensure there is an open connection in both pools; conn is also open but out of the pool
 	err = db.PingContext(ctx)
+	require.NoError(t, err)
+
+	err = db2.PingContext(ctx)
 	require.NoError(t, err)
 
 	err = c.Stop(ctx, lo.ToPtr(1*time.Minute))
@@ -139,9 +146,14 @@ func TestIntegration_Restart(t *testing.T) {
 		return perr == nil
 	}, 2*time.Minute, 2*time.Second)
 
+	// the conn that we took out of the pool before restart should still be bad even after Impala is back up
 	err = conn.PingContext(ctx)
-	require.Error(t, err)
-	// require.ErrorIs(t, err, driver.ErrBadConn) hmmm?
+	require.ErrorIs(t, err, driver.ErrBadConn)
+
+	// Ping on the second pool should succeed even though that pool contains connections that are broken
+	// because of successful retry inside database/sql
+	err = db2.PingContext(ctx)
+	require.NoError(t, err)
 }
 
 func runSuite(t *testing.T, dsn string) {
@@ -175,6 +187,24 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 	t.Run("decimal support", func(t *testing.T) {
 		testDecimal(t, db)
 	})
+	t.Run("set", func(t *testing.T) {
+		testSet(t, db)
+	})
+}
+
+func testSet(t *testing.T, db *sql.DB) {
+	res, err := db.Query("SET")
+	require.NoError(t, err)
+	defer helperr.CloseQuietly(res)
+	cnt := 0
+	for res.Next() {
+		var key, value, configType string
+		require.NoError(t, res.Scan(&key, &value, &configType))
+		cnt++
+	}
+	require.NoError(t, res.Err())
+	require.Greater(t, cnt, 10)
+	require.NoError(t, res.Close())
 }
 
 func runErrorCases(t *testing.T, db *sql.DB) {

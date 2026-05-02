@@ -23,7 +23,7 @@ func (s *Session) Ping(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := s.checkStatus(resp); err != nil {
+	if err = s.checkStatus(resp); err != nil {
 		return err
 	}
 
@@ -42,7 +42,7 @@ func (s *Session) ExecuteStatement(ctx context.Context, stmt string) (*Operation
 	if err != nil {
 		return nil, err
 	}
-	if err := s.checkStatus(resp); err != nil {
+	if err = s.checkStatus(resp); err != nil {
 		return nil, err
 	}
 	s.hive.log.Printf("execute operation: %s; stmt: %s; status code: %s", guid(resp.OperationHandle.OperationId.GUID), stmt, resp.GetStatus().GetStatusCode())
@@ -81,7 +81,7 @@ func (s *Session) Close(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := s.checkStatus(resp); err != nil {
+	if err = s.checkStatus(resp); err != nil {
 		return err
 	}
 	return nil

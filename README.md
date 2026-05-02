@@ -81,6 +81,13 @@ Also, you can bypass the string-based data source name by using sql.OpenDB:
   db, err := sql.OpenDB(connector)
 ```
 
+Impala supports numerous other session options which can be configured with the 
+[SET statement](https://impala.apache.org/docs/build/html/topics/impala_set.html).
+`mem-limit` and `query-timeout` are the only two such options the driver supports as part of the DSN.
+Those DSN fields for those are an exception for backwards compatibility. The preferred way to set any
+session option is issuing SET statements to a SQL connection. Users may find it useful to wrap the 
+`driver.Connector` returned by `impala.NewConnector` so that a set of session options are automatically applied to
+all created connections.
 
 ## CLI
 
