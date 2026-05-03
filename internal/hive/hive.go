@@ -17,7 +17,20 @@ type rpcResponse interface {
 	GetStatus() *cli_service.TStatus
 }
 
-func checkStatus(resp rpcResponse) error {
+type StatusError struct {
+	status     cli_service.TStatus
+	errMessage string
+}
+
+func (e *StatusError) Error() string {
+	return e.errMessage
+}
+
+func (e *StatusError) Status() cli_service.TStatus {
+	return e.status
+}
+
+func checkStatus(resp rpcResponse) (err error) {
 	status := resp.GetStatus()
 	code := status.StatusCode
 
@@ -27,25 +40,35 @@ func checkStatus(resp rpcResponse) error {
 		cli_service.TStatusCode_STILL_EXECUTING_STATUS:
 		return nil
 	case cli_service.TStatusCode_ERROR_STATUS:
-		return fmt.Errorf("%v: %s", code, status.GetErrorMessage())
+		err = &StatusError{*status, fmt.Sprintf("%v: %s", code, status.GetErrorMessage())}
 	case cli_service.TStatusCode_INVALID_HANDLE_STATUS:
-		return errors.New("thrift: invalid handle")
+		err = &StatusError{*status, "thrift: invalid handle"}
 	default:
-		return fmt.Errorf("unexpected code: %d; message: %s", code, status.GetErrorMessage())
+		err = &StatusError{*status, fmt.Sprintf("unexpected code: %d; message: %s", code, status.GetErrorMessage())}
 	}
+	return wrapServerError(err)
 }
 
-func checkState(resp *cli_service.TGetOperationStatusResp) error {
+func checkState(resp *cli_service.TGetOperationStatusResp) (err error) {
 	state := resp.GetOperationState()
 	switch state {
 	case cli_service.TOperationState_CANCELED_STATE:
-		return errors.New("operation cancelled on the server")
+
+		err = errors.New("operation cancelled on the server")
 	case cli_service.TOperationState_ERROR_STATE:
 		// in rare cases status may be SUCCESS even if state is ERROR
 		// for example, if the error is discovered by Hive Metastore but not by Impala
-		return fmt.Errorf("%v: %s", state, resp.GetErrorMessage())
+
+		err = fmt.Errorf("%v: %s", state, resp.GetErrorMessage())
 	}
-	return nil // all other states are considered either success or non-terminal
+	return wrapServerError(err)
+}
+
+func wrapServerError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("remote server error: %w", err)
 }
 
 func guid(b []byte) string {

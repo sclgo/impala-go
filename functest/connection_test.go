@@ -163,8 +163,40 @@ func runSuite(t *testing.T, dsn string) {
 	t.Run("happy", func(t *testing.T) {
 		runHappyCases(t, db)
 	})
+	t.Run("cases with custom DSN", func(t *testing.T) {
+		runCasesWithDsn(t, db, dsn)
+	})
 	t.Run("error", func(t *testing.T) {
 		runErrorCases(t, db)
+	})
+}
+
+func runCasesWithDsn(t *testing.T, db *sql.DB, dsn string) {
+	testSet(t, db, dsn)
+
+	t.Run("reused session expired", func(t *testing.T) {
+		reuseSessionDsn := fi.NoError(url.Parse(dsn)).Require(t)
+		query := reuseSessionDsn.Query()
+		query.Set("reuse-session", "true")
+		reuseSessionDsn.RawQuery = query.Encode()
+
+		dbRS := fi.NoError(sql.Open("impala", reuseSessionDsn.String())).Require(t)
+		defer fi.NoErrorF(dbRS.Close, t)
+		dbRS.SetMaxIdleConns(1)
+
+		// similar to "session expired" test but using the connection pool
+
+		_, err := dbRS.Exec(`SET IDLE_SESSION_TIMEOUT=1`) // in seconds
+		require.NoError(t, err)
+		time.Sleep(2 * time.Second)
+		_, err = dbRS.Query("SELECT 1")
+
+		// Unlike the other "session expired", this time the query succeeds overall.
+		// The pool doesn't initially notice that the connection has expired session, because the connection check
+		// in ResetSession is transport only (at the time of writing). However, when the query fails,
+		// the driver correctly determines the cause and wraps the ErrBadConn sentinel.
+		// database/sql pool reacts to ErrBadConn by closing the connection and retrying the query on a new one.
+		require.NoError(t, err)
 	})
 }
 
@@ -187,24 +219,50 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 	t.Run("decimal support", func(t *testing.T) {
 		testDecimal(t, db)
 	})
-	t.Run("set", func(t *testing.T) {
-		testSet(t, db)
-	})
 }
 
-func testSet(t *testing.T, db *sql.DB) {
-	res, err := db.Query("SET")
-	require.NoError(t, err)
-	defer helperr.CloseQuietly(res)
-	cnt := 0
-	for res.Next() {
-		var key, value, configType string
-		require.NoError(t, res.Scan(&key, &value, &configType))
-		cnt++
+func testSet(t *testing.T, db *sql.DB, dsn string) {
+	var checkSet = func(expectOptIsKept bool, db *sql.DB) {
+		_, err := db.Exec("SET QUERY_TIMEOUT_S=1234")
+		require.NoError(t, err)
+
+		res, err := db.Query("SET")
+		require.NoError(t, err)
+		defer helperr.CloseQuietly(res)
+		cnt := 0
+		found := false
+		for res.Next() {
+			var key, value, configType string
+			require.NoError(t, res.Scan(&key, &value, &configType))
+			cnt++
+			if key == "QUERY_TIMEOUT_S" {
+				found = true
+				if expectOptIsKept {
+					require.Equal(t, "1234", value)
+				} else {
+					require.NotEqual(t, "1234", value)
+				}
+			}
+		}
+		require.NoError(t, res.Err())
+		require.Greater(t, cnt, 10)
+		require.True(t, found)
+		require.NoError(t, res.Close())
 	}
-	require.NoError(t, res.Err())
-	require.Greater(t, cnt, 10)
-	require.NoError(t, res.Close())
+	t.Run("session cleared by default when using sql.DB", func(t *testing.T) {
+		checkSet(false, db)
+	})
+
+	t.Run("set with reuse-session", func(t *testing.T) {
+		reuseSessionDsn := fi.NoError(url.Parse(dsn)).Require(t)
+		query := reuseSessionDsn.Query()
+		query.Set("reuse-session", "true")
+		reuseSessionDsn.RawQuery = query.Encode()
+
+		dbRS := fi.NoError(sql.Open("impala", reuseSessionDsn.String())).Require(t)
+		defer fi.NoErrorF(dbRS.Close, t)
+		checkSet(true, dbRS)
+	})
 }
 
 func runErrorCases(t *testing.T, db *sql.DB) {
@@ -238,6 +296,19 @@ func runErrorCases(t *testing.T, db *sql.DB) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Less(t, time.Since(startTime), 5*time.Second)
 
+	})
+
+	t.Run("session expired", func(t *testing.T) {
+		bkgCtx := context.Background()
+		conn, err := db.Conn(bkgCtx)
+		require.NoError(t, err)
+		// if test passes, conn is closed by database/sql in QueryContext
+		defer helperr.CloseQuietly(conn)
+		_, err = conn.ExecContext(bkgCtx, `SET IDLE_SESSION_TIMEOUT=1`) // in seconds
+		require.NoError(t, err)
+		time.Sleep(2 * time.Second)
+		_, err = conn.QueryContext(bkgCtx, "SELECT 1")
+		require.ErrorIs(t, err, driver.ErrBadConn)
 	})
 }
 

@@ -12,12 +12,26 @@ func init() {
 
 // Options for impala driver connection
 // It is recommended to copy DefaultOptions before customizing values.
-// The zero value of Options is valid but not recommended.
+// The zero value of Options is a valid, but not recommended, configuration.
+// The default and recommended value of all fields is the zero value if not otherwise specified
+// in DefaultOptions.
 type Options struct {
 	Host     string
 	Port     string
 	Username string
 	Password string
+
+	// ReuseSession disables resetting the session when database/sql SPI requests it.
+	// The connection and session will still be validated. database/sql asks to reset the session
+	// when it reuses a connection from its pool.
+	//
+	// All popular drivers don't reset the connection session even though it is required
+	// by the database/sql/driver SPI. When this setting is enabled, this driver behaves consistently
+	// with the other DB drivers in the ecosystem but diverges somewhat from documented database/sql behavior.
+	//
+	// This setting must be enabled when this driver is used in github.com/xo/usql.
+	// `usql` returns the connection to the pool after each statement, relying on the typical driver behavior.
+	ReuseSession bool
 
 	UseLDAP bool
 

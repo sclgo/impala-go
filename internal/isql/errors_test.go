@@ -20,7 +20,7 @@ func TestMapErr(t *testing.T) {
 
 		mappedErr := mapErr(err)
 
-		require.Same(t, err, mappedErr)
+		require.ErrorIs(t, mappedErr, err) // may change in the future
 		require.NotErrorIs(t, mappedErr, driver.ErrBadConn)
 	})
 
@@ -47,7 +47,7 @@ func TestMapErr(t *testing.T) {
 
 		mappedErr := mapErr(err)
 
-		require.Same(t, err, mappedErr)
+		require.ErrorIs(t, mappedErr, err) // may change in the future
 		require.NotErrorIs(t, mappedErr, driver.ErrBadConn)
 	})
 

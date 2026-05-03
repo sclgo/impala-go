@@ -17,12 +17,17 @@ var (
 	ErrNotSupported = errors.New("impala: not supported")
 )
 
+type Options struct {
+	ReuseSession bool
+}
+
 // Conn to impala. It should not be used concurrently by multiple goroutines.
 type Conn struct {
 	transport thrift.TTransport // we use two methods: Close and IsOpen atm, make a dedicated iface if needed
 	session   *hive.Session
 	client    *hive.Client
 	log       *log.Logger
+	opts      Options
 }
 
 // This declaration lists and verifies driver interfaces implemented by *Conn
@@ -141,23 +146,27 @@ func (c *Conn) OpenSession(ctx context.Context) (*hive.Session, error) {
 
 // ResetSession closes hive session
 // Implements driver.SessionResetter
-func (c *Conn) ResetSession(ctx context.Context) error {
-	if c.session != nil {
-		if err := c.session.Close(ctx); err != nil {
-			err = mapErr(err)
-
-			// database/sql uses ResetSession to validate a connection when taking it out of the pool,
-			// but it ignores errors other than ErrBadConn. As a precaution, we check again if the
-			// connection is open on the client, if we haven't mapped it to ErrBadConn already.
-
-			if !errors.Is(err, driver.ErrBadConn) && !c.isTransportOpen() {
-				err = fmt.Errorf("%w: underlying connection is not open after error %v while closing session", driver.ErrBadConn, err)
-			}
-			return err
+func (c *Conn) ResetSession(ctx context.Context) (err error) {
+	if c.session != nil && !c.opts.ReuseSession {
+		err = mapErr(c.session.Close(ctx))
+		if err == nil {
+			c.session = nil
+			return nil // successfully closing the session means that connection is okay.
 		}
-		c.session = nil
 	}
-	return nil
+
+	if errors.Is(err, driver.ErrBadConn) {
+		return err // getting ErrBadConn when resetting the session means that the connection is bad.
+	}
+
+	// database/sql uses ResetSession to both ask the driver to reset the session and to validate
+	// a connection when taking it out of the pool. If we got here, we need to check.
+
+	if !c.isTransportOpen() {
+		return fmt.Errorf("%w: underlying connection was not open in ResetSession", driver.ErrBadConn)
+	}
+
+	return err
 }
 
 // Close connection
@@ -187,10 +196,11 @@ func (c *Conn) IsValid() bool {
 	return c.isTransportOpen()
 }
 
-func NewConn(client *hive.Client, transport thrift.TTransport, logger *log.Logger) *Conn {
+func NewConn(client *hive.Client, transport thrift.TTransport, logger *log.Logger, opts Options) *Conn {
 	return &Conn{
 		transport: transport,
 		client:    client,
 		log:       logger,
+		opts:      opts,
 	}
 }

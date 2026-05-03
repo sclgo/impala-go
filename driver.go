@@ -94,6 +94,12 @@ func parseURI(uri string) (*Options, error) {
 	}
 
 	query := u.Query()
+
+	err = parseBoolKey(query, "reuse-session", &opts.ReuseSession)
+	if err != nil {
+		return nil, err
+	}
+
 	auth := query.Get("auth")
 	if auth == "ldap" {
 		opts.UseLDAP = true
@@ -244,7 +250,9 @@ func connect(opts *Options) (*isql.Conn, error) {
 		QueryTimeout: opts.QueryTimeout,
 	})
 
-	return isql.NewConn(client, transport, logger), nil
+	return isql.NewConn(client, transport, logger, isql.Options{
+		ReuseSession: opts.ReuseSession,
+	}), nil
 }
 
 func configureTransport(opts *Options) (thrift.TTransport, *tls.Config, error) {
