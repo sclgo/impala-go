@@ -18,7 +18,6 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-include "ExecStats.thrift"
 include "cli_service.thrift"
 
 // The summary of a DML statement.

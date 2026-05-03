@@ -4,9 +4,12 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/murfffi/gorich/helperr"
+	"github.com/samber/lo"
+	"github.com/sclgo/impala-go/internal/hive"
 )
 
 func mapErr(err error) error {
@@ -17,7 +20,14 @@ func mapErr(err error) error {
 	if errors.As(err, &tErr) {
 		typeId := tErr.TypeId()
 		if typeId == thrift.NOT_OPEN || typeId == thrift.END_OF_FILE {
-			return fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
+			return wrapBadConn(err)
+		}
+	}
+
+	var hiveStatusErr *hive.StatusError
+	if errors.As(err, &hiveStatusErr) {
+		if strings.Contains(lo.FromPtr(hiveStatusErr.Status().ErrorMessage), "Client session expired") {
+			return wrapBadConn(err)
 		}
 	}
 
@@ -27,8 +37,14 @@ func mapErr(err error) error {
 	// specific error instances, so they can be checked only by message.
 	// Possibly, the reason is that those messages come from the OS.
 	if helperr.ContainsAny(err, "broken pipe", "connection reset by peer") {
-		return fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
+		return wrapBadConn(err)
 	}
 
-	return err
+	return fmt.Errorf("impala: %w", err)
+}
+
+func wrapBadConn(err error) error {
+	// the input error is intentionally not wrapped to avoid exposing internals
+	// guideline: https://go.dev/blog/go1.13-errors
+	return fmt.Errorf("%w inferred from error: %v", driver.ErrBadConn, err)
 }

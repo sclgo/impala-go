@@ -39,6 +39,10 @@ func TestParseURI(t *testing.T) {
 			Options{Host: "localhost", Username: "admin", Password: "p@ssw0rd"},
 		},
 		{
+			"impala://localhost?reuse-session=true",
+			Options{Host: "localhost", ReuseSession: true},
+		},
+		{
 			"impala://admin:p%40ssw0rd@localhost?auth=ldap",
 			Options{Host: "localhost", Username: "admin", Password: "p@ssw0rd", UseLDAP: true},
 		},

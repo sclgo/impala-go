@@ -52,6 +52,16 @@ Driver name is `impala`.
 * `tls-insecure-skip-verify` - disables TLS certificate verification by enabling the 
   [tls.Config.InsecureSkipVerify](https://pkg.go.dev/crypto/tls#Config.InsecureSkipVerify) option.
   Behaves the same way as `AllowSelfSignedCerts` in the official JDBC driver.
+* `reuse-session` - boolean. Disables resetting the session when `database/sql` requests it.
+  `database/sql` asks the driver to reset the session and validate the connection 
+  when it reuses a connection from its pool. All popular drivers validate the connection
+  but don't reset the session even though it is required. 
+  When this setting is enabled, this driver behaves consistently with the other DB drivers
+  in the ecosystem but diverges somewhat from documented database/sql behavior.
+  This setting is disabled by default for backward compatibility and alignment with published Go documentation.
+  It must be enabled when this driver is used in `github.com/xo/usql`.
+  `usql` returns the connection to the pool after each statement, relying on the typical driver behavior.
+  
 
 A string of this format can be constructed using the URL type in the net/url package.
 
