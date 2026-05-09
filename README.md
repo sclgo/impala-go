@@ -211,36 +211,47 @@ are mapped to Go types as expected, with the following exceptions:
 ## Context support
 
 The driver methods recognize [Context](https://pkg.go.dev/context) and support early cancellation in most cases.
-As expected, the `Query` methods return early before all rows are retrieved.
+Additionally, the `Query` methods return early before all rows are retrieved.
 `Exec` methods return after the operation completes (this may be configurable in the future).
 `Exec` methods can still be stopped early by cancelling the context from another goroutine.
 
-It is also supported to use a `Query` method for a DDL/DML statement if you need the method
-to return before the statement completes.
+It is also supported to use a `QueryContext` method on a [sql.Conn](https://pkg.go.dev/database/sql#Conn)
+for a DDL/DML statement if you need the method to return before the statement completes.
 In that case, calling [Rows.Next](https://pkg.go.dev/database/sql#Rows.Next)
 will wait for the statement to complete and then return `false`.
 
 ## Compatibility and Support
 
-The library is actively tested with Impala 4.4 and 3.4.
-All 3.x and 4.x minor versions should work well. 2.x is also supported
-on a best-effort basis.
+The library is actively tested with Impala 4.4 and 3.4. All 3.x and 4.x minor
+versions should work well. 2.x is also supported on a best-effort basis.
+
+While Impala shares the majority of its API with Apache Hive, this driver doesn't support Hive.
+Instead, it is recommended to use a dedicated Hive driver or client.
+Please file an issue if you find it more valuable to use this driver with Hive compared to
+the existing drivers.
+
+The library is *not* compatible with [TinyGo](https://tinygo.org/) because Thrift for Go
+doesn't support it. The Thrift code incompatible with TinyGo is not referenced by
+impala-go but compilation fails nonetheless. Last checked with `tinygo 0.41.1`, `thrift
+0.22`, and `Go 1.26` on `2026-05-01`. (Dev note: Any new release of Thrift or TinyGo may
+resolve the issue. Run `make test-tinygo` after updates to check again.) 
+Progress on TinyGo support is tracked by Thrift team at
+<https://issues.apache.org/jira/browse/THRIFT-5209>.
 
 File any issues that you encounter as GitHub issues.
 
-The library is *not* compatible with [TinyGo](https://tinygo.org/) because
-Thrift for Go doesn't support it. The Thrift code incompatible with TinyGo is not referenced by impala-go
-but compilation fails nonetheless. Last checked with `tinygo 0.41.1` and `Go 1.26` on `2026-05-01`.
-(Dev note: run `make test-tinygo` to check again.) Progress on TinyGo support is tracked by Thrift team at
-<https://issues.apache.org/jira/browse/THRIFT-5209>.
-
 ## Versioning
 
-The library follows semantic versioning, as specified in [SemVer 2.0.0](https://semver.org/),
-and will use semantic import versioning ([SIV](https://research.swtch.com/vgo-import)), if a 2.0 version is ever needed.
+The library follows semantic versioning, as specified in [SemVer 2.0.0](https://semver.org/), 
+and will use semantic import versioning ([SIV](https://research.swtch.com/vgo-import)), if a
+2.0 version is ever needed. However, the [rare exceptions](https://go.dev/doc/go1compat#expectations) 
+to the semantic versioning rules that are allowed for the Go language and standard library, 
+apply to this library as well. For example, a minor release can include a breaking change 
+if the change was required to fix a security issue. Review the rest of the exceptions at
+<https://go.dev/doc/go1compat#expectations>.
 
 [gorelease tool](https://pkg.go.dev/golang.org/x/exp/cmd/gorelease) is included in CI to
-automate detection of most semantic versioning violations.
+automate the detection of most semantic versioning violations.
 
 ## Copyright and acknowledgements
 
