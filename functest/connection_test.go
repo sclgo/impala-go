@@ -243,6 +243,14 @@ func testSet(t *testing.T, db *sql.DB, dsn string) {
 					require.NotEqual(t, "1234", value)
 				}
 			}
+
+			types, err := res.ColumnTypes()
+			require.NoError(t, err)
+			require.Equal(t, 3, len(types))
+			for _, col := range types {
+				require.Equal(t, reflect.TypeFor[string](), col.ScanType())
+				require.Equal(t, "STRING", col.DatabaseTypeName())
+			}
 		}
 		require.NoError(t, res.Err())
 		require.Greater(t, cnt, 10)
