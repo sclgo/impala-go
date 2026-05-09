@@ -225,8 +225,8 @@ will wait for the statement to complete and then return `false`.
 The library is actively tested with Impala 4.4 and 3.4. All 3.x and 4.x minor
 versions should work well. 2.x is also supported on a best-effort basis.
 
-While Impala shares the majority of its API with Apache Hive, this drives doesn't support Hive.
-Instead, it is recommend to use a dedicated Hive driver or client.
+While Impala shares the majority of its API with Apache Hive, this driver doesn't support Hive.
+Instead, it is recommended to use a dedicated Hive driver or client.
 Please file an issue if you find it more valuable to use this driver with Hive compared to
 the existing drivers.
 
