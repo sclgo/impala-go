@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := test
 
 .PHONY: thrift
-export THRIFT_GO_VERSION=$(shell go list -m -f '{{.Version}}' github.com/apache/thrift)
+thrift: export THRIFT_GO_VERSION=$(shell go list -m -f '{{.Version}}' github.com/apache/thrift)
 thrift:
 	@echo THRIFT_GO_VERSION= $${THRIFT_GO_VERSION}
 	bash -c '[[ "$(shell thrift -version)" == *"$${THRIFT_GO_VERSION#v}"* ]]'
