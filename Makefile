@@ -90,7 +90,7 @@ check_tidy:
 	git diff --exit-code --stat go.mod go.sum
 
 .PHONY: check_vuln
-export GOTOOLCHAIN=$(shell go mod edit -json | go run github.com/itchyny/gojq/cmd/gojq@v0.12.19 -r .Toolchain)
+check_vuln: export GOTOOLCHAIN=$(shell go mod edit -json | go run github.com/itchyny/gojq/cmd/gojq@v0.12.19 -r .Toolchain)
 check_vuln:
 	@echo Using $$GOTOOLCHAIN ...
 	go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
