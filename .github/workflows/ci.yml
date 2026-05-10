@@ -47,7 +47,6 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 1.24.13
           - 1.26
 
     runs-on: ubuntu-latest
@@ -77,4 +76,4 @@ jobs:
       - name: Test CLI
         run: make test-cli
         env:
-          GOTOOLCHAIN: auto        
+          GOTOOLCHAIN: auto

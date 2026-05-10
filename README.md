@@ -37,28 +37,26 @@ Driver name is `impala`.
 * `auth` - string. Authentication mode. Supported values: `noauth`, `ldap`.
 * `tls` - boolean. Enable TLS
 * `ca-cert` - The file that contains the public key certificate of the CA that signed the Impala certificate
-* `batch-size` - integer value (default: 1024). Maximum number of rows fetched per request
-* `buffer-size`- in bytes (default: 4096); Buffer size for the Thrift transport 
-* `mem-limit` - string value (example: 3m); Memory limit for query, as a share of memory or fixed value. See
+* `batch-size` - integer value (default: 1024). Maximum number of rows fetched per request.
+* `buffer-size`- in bytes (default: 4096). Buffer size for the Thrift transport.
+* `mem-limit` - string value (example: 3m). Memory limit for query, as a share of available RAM or a fixed value. See
   <https://impala.apache.org/docs/build/html/topics/impala_mem_limit.html> for details.
-* `query-timeout` - integer value in seconds - query timeout. See 
+* `query-timeout` - integer value in seconds. Query timeout - see 
   <https://impala.apache.org/docs/build/html/topics/impala_query_timeout_s.html> for details.
-* `socket-timeout` - integer or string value (default: 5s) - the maximum socket idle time, expressed as a
+* `socket-timeout` - integer or string value (default: 5s). The maximum socket idle time, expressed as a
   time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an integer without
   a time unit, milliseconds are assumed.
-* `connect-timeout` - integer or string value (default: 10s) - the max wait for initial connection to server, 
-  expressed as a  time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an 
+* `connect-timeout` - integer or string value (default: 10s). The max wait for initial connection to server, 
+  expressed as a time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an 
   integer without a time unit, milliseconds are assumed.
-* `tls-insecure-skip-verify` - disables TLS certificate verification by enabling the 
+* `tls-insecure-skip-verify` - boolean. Disables TLS certificate verification by enabling the 
   [tls.Config.InsecureSkipVerify](https://pkg.go.dev/crypto/tls#Config.InsecureSkipVerify) option.
   Behaves the same way as `AllowSelfSignedCerts` in the official JDBC driver.
 * `reuse-session` - boolean. Disables resetting the session when `database/sql` requests it.
-  `database/sql` asks the driver to reset the session and validate the connection 
-  when it reuses a connection from its pool. All popular drivers validate the connection
-  but don't reset the session even though it is required. 
   When this setting is enabled, this driver behaves consistently with the other DB drivers
   in the ecosystem but diverges somewhat from documented database/sql behavior.
-  This setting is disabled by default for backward compatibility and alignment with published Go documentation.
+  This setting is disabled by default for backward compatibility and alignment with 
+  [published Go documentation](https://pkg.go.dev/database/sql/driver#SessionResetter).
   It must be enabled when this driver is used in `github.com/xo/usql`.
   `usql` returns the connection to the pool after each statement, relying on the typical driver behavior.
   
@@ -233,10 +231,9 @@ the existing drivers.
 The library is *not* compatible with [TinyGo](https://tinygo.org/) because Thrift for Go
 doesn't support it. The Thrift code incompatible with TinyGo is not referenced by
 impala-go but compilation fails nonetheless. Last checked with `tinygo 0.41.1`, `thrift
-0.22`, and `Go 1.26` on `2026-05-01`. (Dev note: Any new release of Thrift or TinyGo may
+0.23`, and `Go 1.26` on `2026-05-10`. (Dev note: Any new release of Thrift or TinyGo may
 resolve the issue. Run `make test-tinygo` after updates to check again.) 
-Progress on TinyGo support is tracked by Thrift team at
-<https://issues.apache.org/jira/browse/THRIFT-5209>.
+Thrift team tracks progress on TinyGo support at <https://issues.apache.org/jira/browse/THRIFT-5209>.
 
 File any issues that you encounter as GitHub issues.
 
@@ -252,6 +249,9 @@ if the change was required to fix a security issue. Review the rest of the excep
 
 [gorelease tool](https://pkg.go.dev/golang.org/x/exp/cmd/gorelease) is included in CI to
 automate the detection of most semantic versioning violations.
+
+The minimum Go version may increase in minor, not patch, releases following general practice.
+The last two Go minor releases will always be supported. 
 
 ## Copyright and acknowledgements
 
