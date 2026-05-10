@@ -37,28 +37,26 @@ Driver name is `impala`.
 * `auth` - string. Authentication mode. Supported values: `noauth`, `ldap`.
 * `tls` - boolean. Enable TLS
 * `ca-cert` - The file that contains the public key certificate of the CA that signed the Impala certificate
-* `batch-size` - integer value (default: 1024). Maximum number of rows fetched per request
-* `buffer-size`- in bytes (default: 4096); Buffer size for the Thrift transport 
-* `mem-limit` - string value (example: 3m); Memory limit for query, as a share of memory or fixed value. See
+* `batch-size` - integer value (default: 1024). Maximum number of rows fetched per request.
+* `buffer-size`- in bytes (default: 4096). Buffer size for the Thrift transport.
+* `mem-limit` - string value (example: 3m). Memory limit for query, as a share of available RAM or a fixed value. See
   <https://impala.apache.org/docs/build/html/topics/impala_mem_limit.html> for details.
-* `query-timeout` - integer value in seconds - query timeout. See 
+* `query-timeout` - integer value in seconds. Query timeout - see 
   <https://impala.apache.org/docs/build/html/topics/impala_query_timeout_s.html> for details.
-* `socket-timeout` - integer or string value (default: 5s) - the maximum socket idle time, expressed as a
+* `socket-timeout` - integer or string value (default: 5s). The maximum socket idle time, expressed as a
   time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an integer without
   a time unit, milliseconds are assumed.
-* `connect-timeout` - integer or string value (default: 10s) - the max wait for initial connection to server, 
-  expressed as a  time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an 
+* `connect-timeout` - integer or string value (default: 10s). The max wait for initial connection to server, 
+  expressed as a time duration in this [syntax](https://pkg.go.dev/time#ParseDuration). If the value is an 
   integer without a time unit, milliseconds are assumed.
-* `tls-insecure-skip-verify` - disables TLS certificate verification by enabling the 
+* `tls-insecure-skip-verify` - boolean. Disables TLS certificate verification by enabling the 
   [tls.Config.InsecureSkipVerify](https://pkg.go.dev/crypto/tls#Config.InsecureSkipVerify) option.
   Behaves the same way as `AllowSelfSignedCerts` in the official JDBC driver.
 * `reuse-session` - boolean. Disables resetting the session when `database/sql` requests it.
-  `database/sql` asks the driver to reset the session and validate the connection 
-  when it reuses a connection from its pool. All popular drivers validate the connection
-  but don't reset the session even though it is required. 
   When this setting is enabled, this driver behaves consistently with the other DB drivers
   in the ecosystem but diverges somewhat from documented database/sql behavior.
-  This setting is disabled by default for backward compatibility and alignment with published Go documentation.
+  This setting is disabled by default for backward compatibility and alignment with 
+  [published Go documentation](https://pkg.go.dev/database/sql/driver#SessionResetter).
   It must be enabled when this driver is used in `github.com/xo/usql`.
   `usql` returns the connection to the pool after each statement, relying on the typical driver behavior.
   
