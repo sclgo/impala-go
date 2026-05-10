@@ -1,3 +1,7 @@
+SHELL := bash
+.SHELLFLAGS := -eu -o pipefail -c
+MAKEFLAGS += --warn-undefined-variables
+
 .DEFAULT_GOAL := test
 
 .PHONY: thrift
@@ -18,6 +22,7 @@ usql: Makefile
 .PHONY: short-test
 short-test:
 	go test -short -v -vet=all ./...
+	cd functest && go test -c -vet=all ./...
 
 .PHONY: test-cli
 test-cli: usql

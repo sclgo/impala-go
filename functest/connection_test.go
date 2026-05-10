@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -23,9 +24,10 @@ import (
 	"time"
 
 	"github.com/cockroachdb/apd/v3"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/go-units"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/murfffi/gorich/fi"
 	"github.com/murfffi/gorich/helperr"
 	"github.com/murfffi/gorich/lang"
@@ -94,9 +96,20 @@ func TestIntegration_Restart(t *testing.T) {
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
 		Image:        "apache/kudu:impala-latest",
-		ExposedPorts: []string{"21050:21050"}, // TODO random port that is stable across restart
 		Cmd:          []string{"impala"},
 		WaitingFor:   waitRule,
+		ExposedPorts: []string{dbPort},
+		HostConfigModifier: func(config *container.HostConfig) {
+			// ensure port mapping is fixed so that the port doesn't change across restarts
+			config.PortBindings = map[network.Port][]network.PortBinding{
+				lo.Must(network.ParsePort(dbPort)): {
+					{
+						HostIP:   lo.Must(netip.ParseAddr("0.0.0.0")),
+						HostPort: "21050",
+					},
+				},
+			}
+		},
 	}
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -649,12 +662,16 @@ func setupStack(ctx context.Context, t *testing.T) testcontainers.Container {
 
 	docker, err := testcontainers.NewDockerClientWithOpts(ctx)
 	require.NoError(t, err)
-	warehouseVol, err := docker.VolumeCreate(ctx, volume.CreateOptions{
+	warehouseVolResult, err := docker.VolumeCreate(ctx, client.VolumeCreateOptions{
 		Name: "impala-quickstart-warehouse",
 	})
 	require.NoError(t, err)
+	warehouseVol := warehouseVolResult.Volume
 	fi.CleanupF(t, func() error {
-		return docker.VolumeRemove(context.Background(), warehouseVol.Name, true)
+		_, err := docker.VolumeRemove(context.Background(), warehouseVol.Name, client.VolumeRemoveOptions{
+			Force: true,
+		})
+		return err
 	})
 	warehouseMount := testcontainers.VolumeMount(warehouseVol.Name, "/user/hive/warehouse")
 	localHiveSite := filepath.Join(getConfRoot(t), "quickstart_conf", "hive-site.xml")
