@@ -1,7 +1,10 @@
 .DEFAULT_GOAL := test
 
 .PHONY: thrift
+export THRIFT_GO_VERSION=$(shell go list -m -f '{{.Version}}' github.com/apache/thrift)
 thrift:
+	@echo THRIFT_GO_VERSION= $${THRIFT_GO_VERSION}
+	bash -c '[[ "$(shell thrift -version)" == *"$${THRIFT_GO_VERSION#v}"* ]]'
 	thrift -r -gen go:package_prefix=github.com/sclgo/impala-go/internal/generated/ interfaces/ImpalaService.thrift
 	rm -rf ./internal/generated/
 	mv gen-go ./internal/generated/
@@ -87,8 +90,10 @@ check_tidy:
 	git diff --exit-code --stat go.mod go.sum
 
 .PHONY: check_vuln
+export GOTOOLCHAIN=$(shell go mod edit -json | go run github.com/itchyny/gojq/cmd/gojq@v0.12.19 -r .Toolchain)
 check_vuln:
-	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+	@echo Using $$GOTOOLCHAIN ...
+	go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
 # if we use more tools, we can switch to go tool -modfile=tools.mod
 # there is good discussion at https://news.ycombinator.com/item?id=42845323
 
