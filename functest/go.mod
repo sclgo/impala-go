@@ -67,3 +67,7 @@ require (
 )
 
 replace github.com/sclgo/impala-go v1.6.0 => ../
+
+replace (
+	github.com/apache/thrift v0.23.0 => /home/mnozhchev/src/sclgo/thrift
+)
