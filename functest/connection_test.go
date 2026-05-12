@@ -91,8 +91,7 @@ func TestIntegration_Impala4(t *testing.T) {
 
 func TestIntegration_Restart(t *testing.T) {
 	fi.SkipLongTest(t)
-	// TODO This test is slow and can be optimized by using the Impala 4 multi-container setup
-	// Restarting only impalad will be much faster than restarting the entire stack
+	// TODO Unify the Impala 3 and Impala 4 restart tests, keeping the ability to test both with TLS and plain
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
 		Image:        "apache/kudu:impala-latest",
@@ -165,6 +164,69 @@ func TestIntegration_Restart(t *testing.T) {
 
 	// Ping on the second pool should succeed even though that pool contains connections that are broken
 	// because of successful retry inside database/sql
+	err = db2.PingContext(ctx)
+	require.NoError(t, err)
+}
+
+func TestIntegration_Impala4Restart(t *testing.T) {
+	fi.SkipLongTest(t)
+
+	ctx := context.Background()
+	c := setupStack(ctx, t)
+
+	certPath := filepath.Join(getSslConfDir(t), "localhost.crt")
+	cnct := dynConnector(func() *impala.Options {
+		return &impala.Options{
+			Host:         fi.NoError(c.Host(ctx)).Require(t),
+			Port:         fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
+			Username:     impala4User.Username(),
+			Password:     lo.T2(impala4User.Password()).A,
+			ReuseSession: true,
+			UseLDAP:      true,
+			UseTLS:       true,
+			CACertPath:   fi.NoError(filepath.Abs(certPath)).Require(t),
+		}
+	})
+
+	db := sql.OpenDB(cnct)
+	defer helperr.CloseQuietly(db)
+
+	db2 := sql.OpenDB(cnct)
+	defer helperr.CloseQuietly(db2)
+	db2.SetMaxIdleConns(1)
+
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+
+	defer helperr.CloseQuietly(conn)
+
+	err = conn.PingContext(ctx)
+	require.NoError(t, err)
+
+	// ensure there is an open connection in both pools; conn is also open but out of the pool
+	err = db.PingContext(ctx)
+	require.NoError(t, err)
+
+	err = db2.PingContext(ctx)
+	require.NoError(t, err)
+
+	err = c.Stop(ctx, lo.ToPtr(1*time.Minute))
+	require.NoError(t, err)
+	err = c.Start(ctx)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		perr := db.PingContext(ctx)
+		t.Log(perr)
+		return perr == nil
+	}, 2*time.Minute, 2*time.Second)
+
+	// the conn that we took out of the pool before restart should still be bad even after Impala is back up
+	err = conn.PingContext(ctx)
+	require.ErrorIs(t, err, driver.ErrBadConn)
+
+	// Ping on the second pool should succeed even though that pool contains connections that are broken
+	// because of successful connection verification inside database/sql
 	err = db2.PingContext(ctx)
 	require.NoError(t, err)
 }

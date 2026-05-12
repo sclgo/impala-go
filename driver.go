@@ -339,7 +339,8 @@ func connectThrift(opts *Options) (thrift.TTransport, thrift.TClient, error) {
 		SocketTimeout:      opts.SocketTimeout,
 		ConnectTimeout:     opts.ConnectTimeout,
 	})
-
+	// the transport has been modified by the binary protocol, propagating configuration
+	// we can now Open it
 	if err = transport.Open(); err != nil {
 		addInfo := ""
 		if tlsConf != nil && tlsConf.RootCAs == nil {
