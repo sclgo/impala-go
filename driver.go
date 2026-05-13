@@ -327,7 +327,7 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 
 		err = transport.Open()
 		if err != nil {
-			return nil, nil, fmt.Errorf("impala: authentication failed: %w", err)
+			return nil, nil, fmt.Errorf("%w: authentication failed: %w", ErrOpenFailed, err)
 		}
 	} else {
 		transport = thrift.NewTBufferedTransport(transport, opts.BufferSize)
