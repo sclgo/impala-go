@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -220,21 +221,21 @@ func TestIntegration_Impala4Restart(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		perr := db.PingContext(ctx)
-		//if perr != nil {
-		//	require.ErrorIs(t, perr, driver.ErrBadConn)
-		//}
+		if perr != nil && !errors.Is(perr, impala.ErrOpenFailed) {
+			require.ErrorIs(t, perr, driver.ErrBadConn)
+		}
 		t.Log(perr)
 		return perr == nil
 	}, 2*time.Minute, 2*time.Second)
 
-	//// the conn that we took out of the pool before restart should still be bad even after Impala is back up
-	//err = conn.PingContext(ctx)
-	//require.ErrorIs(t, err, driver.ErrBadConn)
-	//
-	//// Ping on the second pool should succeed even though that pool contains connections that are broken
-	//// because of successful connection verification inside database/sql
-	//err = db2.PingContext(ctx)
-	//require.NoError(t, err)
+	// the conn that we took out of the pool before restart should still be bad even after Impala is back up
+	err = conn.PingContext(ctx)
+	require.ErrorIs(t, err, driver.ErrBadConn)
+
+	// Ping on the second pool should succeed even though that pool contains connections that are broken
+	// because of successful connection verification inside database/sql
+	err = db2.PingContext(ctx)
+	require.NoError(t, err)
 }
 
 func runSuite(t *testing.T, dsn string) {

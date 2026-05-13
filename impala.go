@@ -65,6 +65,10 @@ type Options struct {
 	ConnectTimeout time.Duration
 }
 
+func (o *Options) systemCAStoreSelected() bool {
+	return o.CACertPath == "" && !o.TLSInsecureSkipVerify
+}
+
 var (
 	// DefaultOptions for impala driver
 	DefaultOptions = Options{

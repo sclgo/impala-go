@@ -17,21 +17,28 @@ thrift:
 cli: usql
 
 usql: Makefile
-	go run github.com/sclgo/usqlgen@v0.3.0 -v build --get github.com/sclgo/impala-go@$(shell git branch --show-current || echo master) -- -tags impala
+	go run github.com/sclgo/usqlgen@v0.8.0 -v build --get github.com/sclgo/impala-go@$(shell git branch --show-current || echo master) -- -tags impala
 
 .PHONY: short-test
 short-test:
 	go test -short -v -vet=all ./...
-	cd functest && go test -c -vet=all ./...
 
 .PHONY: test-cli
 test-cli: usql
 	./usql -c "\drivers" | grep impala
 
 .PHONY: test
+test:
+	go test -v -vet=all ./...
+
+.PHONY: vet-func-test
+vet-func-test:
+	cd functest && go test -c -vet=all ./...
+
+.PHONY: test-all
 PKGS=$(shell go list ./... | grep -v "./internal/generated" | grep -v "./examples")
 PKGS_LST=$(shell echo ${PKGS} | tr ' ' ',')
-test: tools/ts
+test-all: tools/ts vet-func-test
 	rm -fr coverage/covdata
 	mkdir -p coverage/covdata
 # Use the new binary format to ensure integration tests and cross-package calls are counted towards coverage
