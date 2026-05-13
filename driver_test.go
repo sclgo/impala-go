@@ -2,6 +2,7 @@ package impala
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"net"
 	"strconv"
@@ -88,43 +89,79 @@ func TestParseURI_Negative(t *testing.T) {
 	drv := &Driver{}
 	t.Run("scheme", func(t *testing.T) {
 		_, err := drv.Open("notimpala://")
-		require.ErrorContains(t, err, badDSNErrorPrefix)
+		require.ErrorIs(t, err, ErrBadDSN)
 		require.ErrorContains(t, err, "notimpala")
 	})
 	t.Run("invalidurl", func(t *testing.T) {
 		_, err := drv.Open("impala://user:pass???@localhost")
-		require.ErrorContains(t, err, badDSNErrorPrefix)
+		require.ErrorIs(t, err, ErrBadDSN)
 		require.ErrorContains(t, err, "parse")
 	})
 	for _, key := range []string{"batch-size", "buffer-size", "query-timeout", "tls", "socket-timeout", "connect-timeout"} {
 		t.Run("invalid "+key, func(t *testing.T) {
 			_, err := drv.Open(fmt.Sprintf("impala://localhost?%s=aa", key))
-			require.ErrorContains(t, err, badDSNErrorPrefix)
+			require.ErrorIs(t, err, ErrBadDSN)
 			require.ErrorContains(t, err, "invalid "+key)
 		})
 	}
 	t.Run("invalid ca-cert", func(t *testing.T) {
 		_, err := drv.Open("impala://localhost?tls=true&ca-cert=aa")
-		require.ErrorContains(t, err, badDSNErrorPrefix)
+		require.ErrorIs(t, err, ErrBadDSN)
 		require.ErrorContains(t, err, "certificate")
 	})
 }
 
 func TestDriver_Integration(t *testing.T) {
 	fi.SkipLongTest(t)
-	t.Run("openUnresponsive", func(t *testing.T) {
-		port := createUnresponsiveSocket(t)
 
-		opts := &Options{
-			Host:          "localhost",
-			Port:          strconv.Itoa(port),
-			SocketTimeout: time.Second,
-		}
-		conn, err := connect(opts)
-		require.NoError(t, err)
-		_, err = conn.OpenSession(context.Background()) // thrift ignores context anyway in most cases
-		require.ErrorContains(t, err, "bad connection")
+	port := createUnresponsiveSocket(t)
+	t.Run("openUnresponsive", func(t *testing.T) {
+		t.Run("plainSocketTimeout", func(t *testing.T) {
+			opts := &Options{
+				Host:          "localhost",
+				Port:          strconv.Itoa(port),
+				SocketTimeout: 100 * time.Millisecond,
+			}
+			conn, err := connect(context.Background(), opts)
+			require.NoError(t, err)
+			_, err = conn.OpenSession(context.Background()) // thrift ignores context in most cases
+			require.ErrorIs(t, err, driver.ErrBadConn)
+		})
+
+		t.Run("tlsCtx", func(t *testing.T) {
+			opts := &Options{
+				Host:   "localhost",
+				Port:   strconv.Itoa(port),
+				UseTLS: true,
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			_, err := connect(ctx, opts)
+			require.ErrorIs(t, err, ErrOpenFailed)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+		})
+
+		// connect timeout is tested with TLS because, for plain sockets, that timeout
+		// impacts only the initial TCP handshake. it is hard to create a test socket that
+		// does that slowly enough.
+
+		t.Run("tlsConnectTimeout", func(t *testing.T) {
+			opts := &Options{
+				Host:           "localhost",
+				Port:           strconv.Itoa(port),
+				UseTLS:         true,
+				ConnectTimeout: 100 * time.Millisecond,
+			}
+			_, err := connect(context.Background(), opts)
+			t.Log(err)
+			require.ErrorIs(t, err, ErrOpenFailed)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			// in this case, the context that exceeded its deadline was created in
+			// one of the variants of net.Dial
+			require.ErrorContains(t, err, "connect timeout")
+		})
 	})
+
 }
 
 func createUnresponsiveSocket(t *testing.T) int {

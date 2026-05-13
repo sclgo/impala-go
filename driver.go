@@ -23,40 +23,46 @@ import (
 	"github.com/sclgo/impala-go/internal/sasl"
 )
 
-// Sentinel errors returned by the driver
+// Custom sentinel errors returned by the driver
 
 var (
 	// ErrNotSupported means the driver does not support this operation
 	ErrNotSupported = isql.ErrNotSupported
+
+	// ErrOpenFailed means the driver failed to open a connection.
+	// Following database/sql docs, this is a separate error from driver.ErrBadConn.
+	// If the root cause is context.DeadlineExceeded, AuthError, or *tls.CertificateVerificationError,
+	// that cause will be in the same error tree as this sentinel, likely as a sibling.
+	ErrOpenFailed = errors.New("impala: failed to open connection")
+
+	// ErrBadDSN means the driver failed to parse the DSN or contained incorrect values.
+	// Another error in the tree will describe the specific issue.
+	ErrBadDSN = errors.New("impala: bad DSN")
 )
 
-// The following errors carry instance information, so they are types, instead of sentinel values.
+// Custom error types returned by the driver
 
 // AuthError indicates that there was an authentication or authorization failure.
 // The error message documents the username used, if any.
 // errors.Unwrap() returns the underlying error interpreted as auth. failure, if any.
-// This error will not be top-level in the chain - earlier errors in the chain
-// reflect the process during which the auth. error happened.
+// This error will not be top-level in the chain/tree - earlier errors
+// reflect the process during which the error happened.
 type AuthError = sasl.AuthError
-
-const (
-	badDSNErrorPrefix = "impala: bad DSN: "
-)
 
 // Driver to impala
 type Driver struct{}
 
-// Open creates new connection to impala using the given data source name. Implements driver.Driver.
-// Returned error wraps any errors coming from thrift or stdlib - typically crypto or net packages.
-// If TLS is requested, and the server certificate fails validation, the error chain includes *tls.CertificateVerificationError
-// If there was an authentication error, an error chain includes one of the exported auth. errors in this package.
+// Open creates a new connection to impala using the given data source name. Implements driver.Driver.
+// The returned error contains ErrOpenFailed in the chain/tree, along with the specific cause.
+// See ErrOpenFailed about which causes are guaranteed to be reported.
+// The API does not guarantee the order of errors in the tree.
 func (d *Driver) Open(dsn string) (driver.Conn, error) {
 	opts, err := parseURI(dsn)
 	if err != nil {
-		return nil, fmt.Errorf(badDSNErrorPrefix+"%w", err)
+		return nil, fmt.Errorf("%w: %w", ErrBadDSN, err)
 	}
 
-	conn, err := connect(opts)
+	conn, err := connect(context.Background(), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -224,9 +230,9 @@ func NewConnector(opts *Options) driver.Connector {
 
 // Connect implements driver.Connector
 // See Driver.Open for details about error results
-func (c *connector) Connect(context.Context) (driver.Conn, error) {
+func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	// TTransport.Open doesn't support context. In general, Thrift almost always doesn't accept or ignores context.
-	return connect(c.opts)
+	return connect(ctx, c.opts)
 }
 
 // Driver implements driver.Connector
@@ -234,11 +240,11 @@ func (c *connector) Driver() driver.Driver {
 	return c.d
 }
 
-func connect(opts *Options) (*isql.Conn, error) {
+func connect(ctx context.Context, opts *Options) (*isql.Conn, error) {
 	if opts.LogOut == nil {
 		opts.LogOut = io.Discard
 	}
-	transport, tclient, err := connectThrift(opts)
+	transport, tclient, err := connectThrift(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -255,45 +261,59 @@ func connect(opts *Options) (*isql.Conn, error) {
 	}), nil
 }
 
-func configureTransport(opts *Options) (thrift.TTransport, *tls.Config, error) {
-	addr := net.JoinHostPort(opts.Host, opts.Port)
+func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thrift.TConfiguration, error) {
+	var err error
+	hostPort := net.JoinHostPort(opts.Host, opts.Port)
 
-	var socket thrift.TTransport
-	var tlsConf *tls.Config
-	if opts.UseTLS {
-
-		tlsConf = &tls.Config{
-			InsecureSkipVerify: opts.TLSInsecureSkipVerify,
-		}
-		if certPath := opts.CACertPath; certPath != "" {
-			caCertPool, err := readCert(certPath)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to read CA certificate: %w", err)
-			}
-			tlsConf.RootCAs = caCertPool
-		}
-		// otherwise "host's root CA set" is used
-
-		// Configuration applied in protocol below
-		socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
-			// should generally be overwritten but setting just in case to avoid regressions like #50
-			TLSConfig: tlsConf,
-		})
-	} else {
-		socket = thrift.NewTSocketConf(addr, &thrift.TConfiguration{})
+	conf := &thrift.TConfiguration{
+		TBinaryStrictRead:  lo.ToPtr(false),
+		TBinaryStrictWrite: lo.ToPtr(true),
+		SocketTimeout:      opts.SocketTimeout,
+		ConnectTimeout:     opts.ConnectTimeout,
 	}
 
 	var transport thrift.TTransport
-	var err error
+	if opts.UseTLS {
+
+		conf.TLSConfig, err = getTLSConfig(opts)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		dialer := tls.Dialer{
+			NetDialer: &net.Dialer{
+				Timeout: conf.GetConnectTimeout(),
+			},
+			Config: conf.TLSConfig,
+		}
+
+		conn, err := dialer.DialContext(ctx, "tcp", hostPort)
+		if err != nil {
+			var addInfo string
+			if opts.systemCAStoreSelected() {
+				addInfo = " (using system root CAs)"
+			}
+			return nil, nil, wrapConnectErr(ctx, err, addInfo)
+		}
+		conn = augment(conn)
+		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
+		// this transport is open
+	} else {
+		transport = thrift.NewTSocketConf(hostPort, conf)
+		if err := transport.Open(); err != nil {
+			return nil, nil, wrapConnectErr(ctx, err, "")
+		}
+	}
+
 	if opts.UseLDAP {
 
 		if opts.Username == "" {
-			return nil, nil, errors.New("provide username for LDAP auth")
+			return nil, nil, fmt.Errorf("%w: provide username for LDAP auth", ErrBadDSN)
 		}
 
 		// Empty password will be used if not provided.
 
-		transport, err = sasl.NewTSaslTransport(socket, &sasl.Options{
+		transport, err = sasl.NewTSaslTransport(transport, &sasl.Options{
 			Host:     opts.Host,
 			Username: opts.Username,
 			Password: opts.Password,
@@ -304,11 +324,40 @@ func configureTransport(opts *Options) (thrift.TTransport, *tls.Config, error) {
 			// NewTSaslTransport always returns nil error
 			return nil, nil, err
 		}
+
+		err = transport.Open()
+		if err != nil {
+			return nil, nil, fmt.Errorf("impala: authentication failed: %w", err)
+		}
 	} else {
-		transport = thrift.NewTBufferedTransport(socket, opts.BufferSize)
+		transport = thrift.NewTBufferedTransport(transport, opts.BufferSize)
 	}
 
-	return transport, tlsConf, nil
+	return transport, conf, nil
+}
+
+func getTLSConfig(opts *Options) (*tls.Config, error) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: opts.TLSInsecureSkipVerify,
+	}
+	if certPath := opts.CACertPath; !opts.TLSInsecureSkipVerify && certPath != "" {
+		caCertPool, err := readCert(certPath)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed to read CA certificate: %w", ErrBadDSN, err)
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+	return tlsConfig, nil
+}
+func wrapConnectErr(ctx context.Context, err error, addInfo string) error {
+	// Add information so the user can tell if "context deadline exceeded" means that
+	// the ConnectTimeout was exceeded or the deadline was from the given context.
+	// Internally, net.DialContext implements ConnectTimeout with a child context.
+	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+		// full message will be something like "connect timeout: context deadline exceeded"
+		addInfo += " connect timeout context:"
+	}
+	return fmt.Errorf("%w:%s %w", ErrOpenFailed, addInfo, err)
 }
 
 func readCert(certPath string) (*x509.CertPool, error) {
@@ -325,29 +374,13 @@ func readCert(certPath string) (*x509.CertPool, error) {
 	return caCertPool, nil
 }
 
-func connectThrift(opts *Options) (thrift.TTransport, thrift.TClient, error) {
-	transport, tlsConf, err := configureTransport(opts)
-	if err != nil {
-		return nil, nil, fmt.Errorf(badDSNErrorPrefix+"%w", err)
-	}
+func connectThrift(ctx context.Context, opts *Options) (thrift.TTransport, thrift.TClient, error) {
+	transport, conf, err := openTransport(ctx, opts)
 
-	protocol := thrift.NewTBinaryProtocolConf(transport, &thrift.TConfiguration{
-		// The following configuration is propagated to Transport / Socket
-		TBinaryStrictRead:  lo.ToPtr(false),
-		TBinaryStrictWrite: lo.ToPtr(true),
-		TLSConfig:          tlsConf,
-		SocketTimeout:      opts.SocketTimeout,
-		ConnectTimeout:     opts.ConnectTimeout,
-	})
-	// the transport has been modified by the binary protocol, propagating configuration
-	// we can now Open it
-	if err = transport.Open(); err != nil {
-		addInfo := ""
-		if tlsConf != nil && tlsConf.RootCAs == nil {
-			addInfo = " using system root CAs"
-		}
-		return nil, nil, fmt.Errorf("impala: failed to open connection%s: %w", addInfo, err)
+	if err != nil {
+		return nil, nil, err
 	}
+	protocol := thrift.NewTBinaryProtocolConf(transport, conf)
 
 	tclient := thrift.NewTStandardClient(protocol, protocol)
 	return transport, tclient, nil
