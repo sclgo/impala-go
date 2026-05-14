@@ -14,11 +14,11 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -27,7 +27,6 @@ import (
 	"github.com/cockroachdb/apd/v3"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"github.com/murfffi/gorich/fi"
 	"github.com/murfffi/gorich/helperr"
@@ -93,24 +92,12 @@ func TestIntegration_Impala4(t *testing.T) {
 func TestIntegration_Restart(t *testing.T) {
 	fi.SkipLongTest(t)
 	// TODO Unify the Impala 3 and Impala 4 restart tests, keeping the ability to test both with TLS and plain
-	// Remove duplicate code
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
 		Image:        "apache/kudu:impala-latest",
 		Cmd:          []string{"impala"},
 		WaitingFor:   waitRule,
 		ExposedPorts: []string{dbPort},
-		HostConfigModifier: func(config *container.HostConfig) {
-			// ensure port mapping is fixed so that the port doesn't change across restarts
-			config.PortBindings = map[network.Port][]network.PortBinding{
-				lo.Must(network.ParsePort(dbPort)): {
-					{
-						HostIP:   lo.Must(netip.ParseAddr("0.0.0.0")),
-						HostPort: "21050",
-					},
-				},
-			}
-		},
 	}
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -118,85 +105,32 @@ func TestIntegration_Restart(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	dsn := getDsn(ctx, t, c, nil)
 	t.Cleanup(func() {
 		err := c.Terminate(ctx)
 		assert.NoError(t, err)
 	})
 
-	db := fi.NoError(sql.Open("impala", dsn)).Require(t)
-	defer helperr.CloseQuietly(db)
-
-	db2 := fi.NoError(sql.Open("impala", dsn)).Require(t)
-	defer helperr.CloseQuietly(db2)
-	db2.SetMaxIdleConns(1)
-
-	conn, err := db.Conn(ctx)
-	require.NoError(t, err)
-
-	defer helperr.CloseQuietly(conn)
-
-	err = conn.PingContext(ctx)
-	require.NoError(t, err)
-
-	// ensure there is an open connection in both pools; conn is also open but out of the pool
-	err = db.PingContext(ctx)
-	require.NoError(t, err)
-
-	err = db2.PingContext(ctx)
-	require.NoError(t, err)
-
-	err = c.Stop(ctx, lo.ToPtr(1*time.Minute))
-	require.NoError(t, err)
-	err = c.Start(ctx)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		perr := db.PingContext(ctx)
-		if perr != nil {
-			require.ErrorIs(t, perr, driver.ErrBadConn)
-		}
-		t.Log(perr)
-		return perr == nil
-	}, 2*time.Minute, 2*time.Second)
-
-	// the conn that we took out of the pool before restart should still be bad even after Impala is back up
-	err = conn.PingContext(ctx)
-	require.ErrorIs(t, err, driver.ErrBadConn)
-
-	// Ping on the second pool should succeed even though that pool contains connections that are broken
-	// because of successful retry inside database/sql
-	err = db2.PingContext(ctx)
-	require.NoError(t, err)
-}
-
-// TestIntegration_Impala4Restart does not pass yet
-// https://github.com/sclgo/impala-go/issues/105
-func TestIntegration_Impala4Restart(t *testing.T) {
-	fi.SkipLongTest(t)
-
-	ctx := context.Background()
-	c := setupStack(ctx, t)
-
-	certPath := filepath.Join(getSslConfDir(t), "localhost.crt")
 	cnct := dynConnector(func() *impala.Options {
 		return &impala.Options{
-			Host:         fi.NoError(c.Host(ctx)).Require(t),
-			Port:         fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
-			Username:     impala4User.Username(),
-			Password:     lo.T2(impala4User.Password()).A,
-			ReuseSession: true,
-			UseLDAP:      true,
-			UseTLS:       true,
-			CACertPath:   fi.NoError(filepath.Abs(certPath)).Require(t),
+			Host: fi.NoError(c.Host(ctx)).Require(t),
+			Port: fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
+			// On Windows, the lightweight connectivity check in Thrift doesn't work yet,
+			// Instead, resetting the session checks the connection as a side effect.
+			ReuseSession: runtime.GOOS != "windows",
 		}
 	})
 
+	testRestart(t, cnct, c)
+}
+
+func testRestart(t *testing.T, cnct dynConnector, c testcontainers.Container) {
+	ctx := context.Background()
 	db := sql.OpenDB(cnct)
 	defer helperr.CloseQuietly(db)
 
 	db2 := sql.OpenDB(cnct)
 	defer helperr.CloseQuietly(db2)
+
 	db2.SetMaxIdleConns(1)
 
 	conn, err := db.Conn(ctx)
@@ -221,6 +155,9 @@ func TestIntegration_Impala4Restart(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		perr := db.PingContext(ctx)
+		// Ping, Query and Exec can return either ErrOpenFailed or ErrBadConn if there is no connection.
+		// ErrBadConn means I tried to ping/query but that failed, and it seems it was because I used a bad connection.
+		// ErrOpenFailed means all the connections in the pool were bad, I tried to open a new one, and still failed.
 		if perr != nil && !errors.Is(perr, impala.ErrOpenFailed) {
 			require.ErrorIs(t, perr, driver.ErrBadConn)
 		}
@@ -236,6 +173,31 @@ func TestIntegration_Impala4Restart(t *testing.T) {
 	// because of successful connection verification inside database/sql
 	err = db2.PingContext(ctx)
 	require.NoError(t, err)
+}
+
+func TestIntegration_Impala4Restart(t *testing.T) {
+	fi.SkipLongTest(t)
+
+	ctx := context.Background()
+	c := setupStack(ctx, t)
+
+	certPath := filepath.Join(getSslConfDir(t), "localhost.crt")
+	cnct := dynConnector(func() *impala.Options {
+		return &impala.Options{
+			Host:     fi.NoError(c.Host(ctx)).Require(t),
+			Port:     fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
+			Username: impala4User.Username(),
+			Password: lo.T2(impala4User.Password()).A,
+			// On Windows, the lightweight connectivity check in Thrift doesn't work yet,
+			// Instead, resetting the session checks the connection as a side effect.
+			ReuseSession: runtime.GOOS != "windows",
+			UseLDAP:      true,
+			UseTLS:       true,
+			CACertPath:   fi.NoError(filepath.Abs(certPath)).Require(t),
+		}
+	})
+
+	testRestart(t, cnct, c)
 }
 
 func runSuite(t *testing.T, dsn string) {

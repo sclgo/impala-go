@@ -36,7 +36,7 @@ func mapErr(err error) error {
 	// Looking at go stdlib code, it seems that both "broken pipe" and "reset" are not
 	// specific error instances, so they can be checked only by message.
 	// Possibly, the reason is that those messages come from the OS.
-	if helperr.ContainsAny(err, "broken pipe", "connection reset by peer") {
+	if helperr.ContainsAny(err, "broken pipe", "connection reset by peer", "connection was aborted") {
 		return wrapBadConn(err)
 	}
 
