@@ -184,13 +184,11 @@ func TestIntegration_Impala4Restart(t *testing.T) {
 	certPath := filepath.Join(getSslConfDir(t), "localhost.crt")
 	cnct := dynConnector(func() *impala.Options {
 		return &impala.Options{
-			Host:     fi.NoError(c.Host(ctx)).Require(t),
-			Port:     fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
-			Username: impala4User.Username(),
-			Password: lo.T2(impala4User.Password()).A,
-			// On Windows, the lightweight connectivity check in Thrift doesn't work yet,
-			// Instead, resetting the session checks the connection as a side effect.
-			ReuseSession: runtime.GOOS != "windows",
+			Host:         fi.NoError(c.Host(ctx)).Require(t),
+			Port:         fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
+			Username:     impala4User.Username(),
+			Password:     lo.T2(impala4User.Password()).A,
+			ReuseSession: true,
 			UseLDAP:      true,
 			UseTLS:       true,
 			CACertPath:   fi.NoError(filepath.Abs(certPath)).Require(t),
