@@ -297,7 +297,7 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 		}
 		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
 		transport = checkedTransport{
-			conn:       conn,
+			conn:       conn.(*tls.Conn), // type guaranteed by DialContext doc
 			TTransport: transport,
 		}
 	} else {

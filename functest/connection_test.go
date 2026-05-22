@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -112,11 +111,9 @@ func TestIntegration_Restart(t *testing.T) {
 
 	cnct := dynConnector(func() *impala.Options {
 		return &impala.Options{
-			Host: fi.NoError(c.Host(ctx)).Require(t),
-			Port: fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
-			// On Windows, the lightweight connectivity check in Thrift doesn't work yet,
-			// Instead, resetting the session checks the connection as a side effect.
-			ReuseSession: runtime.GOOS != "windows",
+			Host:         fi.NoError(c.Host(ctx)).Require(t),
+			Port:         fi.NoError(c.MappedPort(ctx, dbPort)).Require(t).Port(),
+			ReuseSession: true,
 		}
 	})
 
