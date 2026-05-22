@@ -295,9 +295,11 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 			}
 			return nil, nil, wrapConnectErr(ctx, err, addInfo)
 		}
-		conn = augment(conn)
 		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
-		// this transport is open
+		transport = checkedTransport{
+			conn:       conn.(*tls.Conn), // type guaranteed by DialContext doc
+			TTransport: transport,
+		}
 	} else {
 		transport = thrift.NewTSocketConf(hostPort, conf)
 		if err := transport.Open(); err != nil {
