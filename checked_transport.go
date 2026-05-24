@@ -22,7 +22,6 @@ var _ interface {
 } = checkedTransport{}
 
 func (t checkedTransport) IsOpen() bool {
-	// Due to THRIFT-5996, IsOpen on a TLS connection only checks if closed is called
-	// so we need additionally murfffi/conncheck. Avoid using this type on a non-TLS conn
+	// Due to THRIFT-5996, IsOpen on a TLS connection additionally needs murfffi/conncheck.
 	return t.TTransport.IsOpen() && conncheck.Do(t.conn) != conncheck.StatusNotOpen
 }
