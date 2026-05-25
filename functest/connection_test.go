@@ -145,10 +145,7 @@ func testRestart(t *testing.T, cnct dynConnector, c testcontainers.Container) {
 	err = db2.PingContext(ctx)
 	require.NoError(t, err)
 
-	err = c.Stop(ctx, lo.ToPtr(1*time.Minute))
-	require.NoError(t, err)
-	err = c.Start(ctx)
-	require.NoError(t, err)
+	err = killConnectiions(ctx, t, c)
 
 	require.Eventually(t, func() bool {
 		perr := db.PingContext(ctx)
@@ -170,6 +167,18 @@ func testRestart(t *testing.T, cnct dynConnector, c testcontainers.Container) {
 	// because of successful connection verification inside database/sql
 	err = db2.PingContext(ctx)
 	require.NoError(t, err)
+}
+
+// killConnectiions kills connections to the database
+func killConnectiions(ctx context.Context, t *testing.T, c testcontainers.Container) error {
+	// Best way that we know so far is to restart the container
+	err := c.Stop(ctx, lo.ToPtr(1*time.Minute))
+	require.NoError(t, err)
+	err = c.Start(ctx)
+	require.NoError(t, err)
+	return err
+
+	// With sudo, you can do "sudo ss -K -t dst :21050" where 21050 is the Impala port
 }
 
 func TestIntegration_Impala4Restart(t *testing.T) {

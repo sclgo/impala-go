@@ -6,7 +6,7 @@ require (
 	github.com/apache/thrift v0.23.0
 	github.com/google/uuid v1.6.0
 	github.com/jinzhu/copier v0.4.0
-	github.com/murfffi/conncheck v0.1.0
+	github.com/murfffi/conncheck v0.2.0
 	github.com/murfffi/gorich v0.3.0
 	github.com/samber/lo v1.53.0
 	github.com/stretchr/testify v1.11.1
