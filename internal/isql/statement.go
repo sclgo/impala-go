@@ -50,8 +50,6 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 
 // QueryContext executes a query that may return rows
 func (s *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	// It is slightly ineffecient to call template() again via conn.QueryContext
-	// but the simpler code is worth it.
 	return s.conn.QueryContext(ctx, s.stmt, args)
 }
 
@@ -60,18 +58,62 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	return s.conn.ExecContext(ctx, s.stmt, args)
 }
 
+// template replaces all ? placeholders with ordinal placeholders
+// Supports for ? placeholders mirrors the Hive and Impala JDBC drivers,
+// providing compatibility with them.
+// '?' inside string literals or identifiers are allowed and are not placeholders.
 func template(query string) string {
-	ordinal := 1
-	for {
-		idx := strings.Index(query, "?")
-		if idx == -1 {
-			break
-		}
-		placeholder := fmt.Sprintf("@p%d", ordinal)
-		query = strings.Replace(query, "?", placeholder, 1)
-		ordinal++
+	if !strings.Contains(query, "?") {
+		return query
 	}
-	return query
+
+	// Docs:https://impala.apache.org/docs/build/html/topics/impala_literals.html
+	// https://impala.apache.org/docs/build/html/topics/impala_identifiers.html
+	// JDBC impl:https://github.com/apache/hive/blob/83d98f42fc7/jdbc/src/java/org/apache/hive/jdbc/HivePreparedStatement.java#L141
+
+	var sb strings.Builder
+	sb.Grow(len(query))
+	ordinal := 1
+	cntQuote := 0
+	cntDQuote := 0
+	cntBacktick := 0
+	for i := 0; i < len(query); i++ {
+		c := query[i]
+		if c == '\\' {
+			sb.WriteByte(c)
+			if i+1 < len(query) {
+				sb.WriteByte(query[i+1])
+				i++
+			}
+			continue
+		}
+
+		var replaced bool
+		switch c {
+		case '"':
+			if cntQuote%2 == 0 && cntBacktick%2 == 0 {
+				cntDQuote++
+			}
+		case '\'':
+			if cntDQuote%2 == 0 && cntBacktick%2 == 0 {
+				cntQuote++
+			}
+		case '`':
+			if cntQuote%2 == 0 && cntDQuote%2 == 0 {
+				cntBacktick++
+			}
+		case '?':
+			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
+				sb.WriteString(fmt.Sprintf("@p%d", ordinal))
+				ordinal++
+				replaced = true
+			}
+		}
+		if !replaced {
+			sb.WriteByte(c)
+		}
+	}
+	return sb.String()
 }
 
 func statement(tmpl string, args []driver.NamedValue) string {

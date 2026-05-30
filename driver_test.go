@@ -14,6 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewConnector(t *testing.T) {
+	t.Run("driver", func(t *testing.T) {
+		cnct := NewConnector(&Options{})
+		require.IsType(t, &Driver{}, cnct.Driver())
+		// check if returned driver.Driver instance is valid
+		_, err := cnct.Driver().Open("foobar")
+		require.ErrorIs(t, err, ErrBadDSN)
+	})
+}
+
 func TestParseURI(t *testing.T) {
 	tests := []struct {
 		in  string

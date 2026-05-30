@@ -3,6 +3,8 @@ package isql
 import (
 	"database/sql/driver"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestStatement_ValueReplacement(t *testing.T) {
@@ -39,9 +41,47 @@ func TestStatement_ValueReplacement(t *testing.T) {
 
 	for _, tt := range tests {
 		result := statement(tt.stmt, tt.args)
+		require.Equal(t, tt.target, result)
+	}
+}
 
-		if result != tt.target {
-			t.Fatalf("mismatch for statement: %q\n\ttarget: %q\n\tresult: %q", tt.stmt, tt.target, result)
-		}
+func TestTemplate(t *testing.T) {
+	tests := []struct {
+		stmt   string
+		target string
+	}{
+		{
+			stmt:   "?",
+			target: "@p1",
+		},
+		{
+			stmt:   "value(\"what's my name?\")",
+			target: "value(\"what's my name?\")",
+		},
+		{
+			stmt:   "\\?",
+			target: "\\?",
+		},
+		{
+			stmt:   "'Hi \\'name\\'?'",
+			target: "'Hi \\'name\\'?'",
+		},
+		{
+			stmt:   "values('name?', ?, 'age', ?, 'height', ?)",
+			target: "values('name?', @p1, 'age', @p2, 'height', @p3)",
+		},
+		{
+			stmt:   "values('\"', ?)",
+			target: "values('\"', @p1)",
+		},
+		{
+			stmt:   "`columnname?`",
+			target: "`columnname?`",
+		},
+	}
+
+	for _, tt := range tests {
+		result := template(tt.stmt)
+		require.Equal(t, tt.target, result)
 	}
 }
