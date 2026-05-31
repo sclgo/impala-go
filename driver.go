@@ -49,14 +49,27 @@ var (
 // reflect the process during which the error happened.
 type AuthError = sasl.AuthError
 
-// Driver to impala
+// Driver to Impala
+// DSN syntax: impala://[username[:password]@]host[:port][?param=value]
+// See Options for details about the parameters.
+// Highlighted features:
+//
+// - Statement parameter placeholders can be either: ? (like in Hive/Impala JDBC driver),
+// @p1 (where 1 is the parameter number in the list), @pname (where name is the parameter name).
+//
+// - Context parameter in all methods is supported and observed.
+//
+// Driver is registered as "impala" in the database/sql package - see impala.go.
+//
+// See README.md for more details.
 type Driver struct{}
 
 // Open creates a new connection to impala using the given data source name. Implements driver.Driver.
 // The returned error contains ErrOpenFailed in the chain/tree, along with the specific cause.
 // See ErrOpenFailed about which causes are guaranteed to be reported.
 // The API does not guarantee the order of errors in the tree.
-func (d *Driver) Open(dsn string) (driver.Conn, error) {
+// Open can be called on a nil driver.
+func (*Driver) Open(dsn string) (driver.Conn, error) {
 	opts, err := parseURI(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrBadDSN, err)
@@ -207,8 +220,9 @@ func parseIntKey(query url.Values, key string, target *int) (err error) {
 }
 
 // OpenConnector parses name as a DSN (data source name) and returns connector with fixed options
-// Implements driver.DriverContext
-func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
+//
+// Implements driver.DriverContext. See also NewConnector.
+func (*Driver) OpenConnector(name string) (driver.Connector, error) {
 
 	opts, err := parseURI(name)
 	if err != nil {
@@ -219,25 +233,29 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 }
 
 type connector struct {
-	d    *Driver
 	opts *Options
 }
 
-// NewConnector creates connector with specified options
+// NewConnector creates a connector with specified options.
+//
+// The connector is intended to be used with sql.OpenDB -
+// using driver.Conn directly should be avoided.
+// If needed, users can wrap the connector to implement custom
+// features e.g., statements to initialize connections.
 func NewConnector(opts *Options) driver.Connector {
 	return &connector{opts: opts}
 }
 
 // Connect implements driver.Connector
-// See Driver.Open for details about error results
+//
+// See Driver.Open for details about error results.
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
-	// TTransport.Open doesn't support context. In general, Thrift almost always doesn't accept or ignores context.
 	return connect(ctx, c.opts)
 }
 
 // Driver implements driver.Connector
 func (c *connector) Driver() driver.Driver {
-	return c.d
+	return (*Driver)(nil) // Driver methods work on a nil reference
 }
 
 func connect(ctx context.Context, opts *Options) (*isql.Conn, error) {

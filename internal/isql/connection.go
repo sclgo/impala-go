@@ -84,7 +84,7 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 func (c *Conn) PrepareContext(_ context.Context, query string) (driver.Stmt, error) {
 	return &Stmt{
 		conn: c,
-		stmt: template(query),
+		stmt: query,
 	}, nil
 }
 
