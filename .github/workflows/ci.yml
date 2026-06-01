@@ -17,8 +17,6 @@ jobs:
 
     - name: Set up Go
       uses: actions/setup-go@v6
-      with:
-        go-version: "1.25.10"
 
     - name: Build
       run: go build -v ./...
@@ -73,11 +71,9 @@ jobs:
 
       - name: Set up Go
         uses: actions/setup-go@v6
-        with:
-          go-version: "1.25.10"
 
       - name: Test
-        run: make test vet-func-test
+        run: make test func-test
 
   post-merge:
     runs-on: ubuntu-latest

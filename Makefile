@@ -20,7 +20,7 @@ usql: Makefile
 	go run github.com/sclgo/usqlgen@v0.8.0 -v build --get github.com/sclgo/impala-go@$(shell git branch --show-current || echo master) -- -tags impala
 
 .PHONY: short-test
-short-test:
+short-test: ## Unit and other fast tests without dependencies without race detection (Windows-compatible)
 	go test -short -v -vet=all ./...
 
 .PHONY: test-cli
@@ -28,7 +28,7 @@ test-cli: usql
 	./usql -c "\drivers" | grep impala
 
 .PHONY: test
-test:
+test: ## Unit and light integration tests without coverage or race detector (Windows-compatible)
 	go test -v -vet=all ./...
 
 .PHONY: vet-func-test
@@ -66,6 +66,10 @@ test-all: tools/ts vet-func-test
 	go tool covdata textfmt -i=./coverage/covdata -o ./coverage/covprofile
 	go tool cover -html=./coverage/covprofile -o ./coverage/coverage.html
 
+.PHONY: func-test
+func-test: ## Func. tests without coverage or race detector (Windows-compatible)
+	cd functest && go test -v -timeout 15m -p 1 ./...
+
 #NB: CI uses the golangci-lint Github action, not this target
 .PHONY: lint
 lint: tools/golangci-lint
@@ -73,7 +77,7 @@ lint: tools/golangci-lint
 
 # NB: Fails with tinygo 0.41.1, latest as of 2026-05-01
 .PHONY: test-tinygo
-test-tinygo: # Checks if impala-go compiles with TinyGo
+test-tinygo: ## Checks if impala-go compiles with TinyGo
 	tinygo version
 	tinygo test -short ./...
 
@@ -81,15 +85,16 @@ test-tinygo: # Checks if impala-go compiles with TinyGo
 checks: check_changes check_deps check_tidy check_vuln check_modern
 
 .PHONY: check_changes
-check_changes:
+check_changes: ## Ensure intended next version is appropriate for the code changes
 # make sure .next.version contains the intended next version
 # if the following fails, update either the next version or undo any unintended api changes
+# Docs: https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme
+# https://pkg.go.dev/golang.org/x/exp/cmd/gorelease
 	go run golang.org/x/exp/cmd/gorelease@v0.0.0-20260112195511-716be5621a96 -version $(shell cat .next.version)
 
 .PHONY: check_deps
-check_deps:
-# checks for possibly leaked dependencies like in
-# https://www.dolthub.com/blog/2022-11-07-pruning-test-dependencies-from-golang-binaries/
+check_deps: ## Checks for possibly leaked dependencies
+# like in https://www.dolthub.com/blog/2022-11-07-pruning-test-dependencies-from-golang-binaries/
 	go build ./examples/enumerateDB.go
 	strings enumerateDB | grep -m 1 github.com/sclgo/impala-go # sanity
 	! (strings enumerateDB | grep testify)
@@ -114,7 +119,7 @@ check_vuln:
 check_modern:
 	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@v0.20.0 ./...
 # non-zero exit status on issues found
-# nb: modernize is not part of golangci-lint yet - https://github.com/golangci/golangci-lint/issues/686
+# nb: to be replaced with go fix when 1.26 becomes minimal version i.e. when 1.27 is released
 
 # Tools targets
 

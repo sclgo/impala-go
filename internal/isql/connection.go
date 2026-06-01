@@ -56,7 +56,10 @@ func (c *Conn) Ping(ctx context.Context) error {
 // isTransportOpen checks if the underlying connection is open without doing a roundtrip
 // and without blocking on IO. It can be used in cases where Ping will be too slow or unnecessary.
 func (c *Conn) isTransportOpen() bool {
-	// thrift implements that with a non-blocking peek of a byte over the socket
+	// On TLS connections, the following call is eventually delegated to impala.checkedTransport.
+	// On plain connections, we use the thrift implementation, which is Linux-only -
+	// a non-blocking peek of a byte over the socket. Will be replaced with checkedTransport too soon.
+	// See impala.openTransport in driver.go.
 	return c.transport.IsOpen()
 }
 
