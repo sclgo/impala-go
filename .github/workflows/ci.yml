@@ -77,7 +77,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Test
-        run: make test func-test
+        run: make test vet-func-test
 
   post-merge:
     runs-on: ubuntu-latest
