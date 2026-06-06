@@ -26,12 +26,17 @@ func mapErr(err error) error {
 
 	var hiveStatusErr *hive.StatusError
 	if errors.As(err, &hiveStatusErr) {
+		// StatusCode, SqlState, and ErrorCode are not informative. SqlState = HY000 means "general error"
 		if strings.Contains(lo.FromPtr(hiveStatusErr.Status().ErrorMessage), "Client session expired") {
 			return wrapBadConn(err)
 		}
 	}
 
 	// As a precaution, look for other indicators of ErrBadConn
+
+	if isOSBadConn(err) {
+		return wrapBadConn(err)
+	}
 
 	// Looking at go stdlib code, it seems that both "broken pipe" and "reset" are not
 	// specific error instances, so they can be checked only by message.
