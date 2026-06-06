@@ -1,6 +1,6 @@
 module github.com/sclgo/impala-go
 
-go 1.25.10
+go 1.25.11
 
 require (
 	github.com/apache/thrift v0.23.0

@@ -110,7 +110,8 @@ check_tidy:
 #uncomment if toolchain set
 #check_vuln: export GOTOOLCHAIN=$(shell go mod edit -json | go run github.com/itchyny/gojq/cmd/gojq@v0.12.19 -r .Toolchain)
 check_vuln:
-	@echo Using GOTOOLCHAIN=$$GOTOOLCHAIN ...
+	@echo Using GOTOOLCHAIN=$${GOTOOLCHAIN:-} ...
+	go version
 	go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
 # if we use more tools, we can switch to go tool -modfile=tools.mod
 # there is good discussion at https://news.ycombinator.com/item?id=42845323
@@ -137,4 +138,4 @@ tools/golangci-lint: tools
 # We install golangci-lint as recommended in the docs. See the same docs for a discussion about go run and
 # go get -tool alternatives - https://golangci-lint.run/docs/welcome/install/ .
 # Delete tools/golangci-lint if this target is updated (may be automated in the future)
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b ./tools v2.7.2
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b ./tools v2.12.2

@@ -35,7 +35,7 @@ func (s *Stmt) NumInput() int {
 // if it wouldn't add anything to the Conn impl. of the same interface.
 
 // Exec executes a query that doesn't return rows
-func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
+func (s *Stmt) Exec([]driver.Value) (driver.Result, error) {
 	// This implementation is never used in recent versions of Go - ExecContext is used instead
 	// even when the user calls sql.Stmt.Exec(). Following the example in database/sql/fakedb_test.go
 	// we can implement this as:
@@ -43,7 +43,7 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 // Query executes a query that may return rows
-func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
+func (s *Stmt) Query([]driver.Value) (driver.Rows, error) {
 	// Comment in Exec() above applies here as well.
 	panic("QueryContext was not called.")
 }
@@ -104,7 +104,8 @@ func template(query string) string {
 			}
 		case '?':
 			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
-				sb.WriteString(fmt.Sprintf("@p%d", ordinal))
+				// Fprintf to strings.Builder can't return err
+				_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
 				ordinal++
 				replaced = true
 			}
