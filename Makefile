@@ -110,7 +110,8 @@ check_tidy:
 #uncomment if toolchain set
 #check_vuln: export GOTOOLCHAIN=$(shell go mod edit -json | go run github.com/itchyny/gojq/cmd/gojq@v0.12.19 -r .Toolchain)
 check_vuln:
-	@echo Using GOTOOLCHAIN=$$GOTOOLCHAIN ...
+	@echo Using GOTOOLCHAIN=$${GOTOOLCHAIN:-} ...
+	go version
 	go run golang.org/x/vuln/cmd/govulncheck@v1.3.0 ./...
 # if we use more tools, we can switch to go tool -modfile=tools.mod
 # there is good discussion at https://news.ycombinator.com/item?id=42845323
