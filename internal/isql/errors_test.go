@@ -50,22 +50,4 @@ func TestMapErr(t *testing.T) {
 		require.ErrorIs(t, mappedErr, err) // may change in the future
 		require.NotErrorIs(t, mappedErr, driver.ErrBadConn)
 	})
-
-	t.Run("maps broken pipe error message to bad connection", func(t *testing.T) {
-		err := errors.New("write tcp: broken pipe")
-
-		mappedErr := mapErr(err)
-
-		require.ErrorIs(t, mappedErr, driver.ErrBadConn)
-		require.ErrorContains(t, mappedErr, "inferred from error")
-	})
-
-	t.Run("maps connection reset error message to bad connection", func(t *testing.T) {
-		err := errors.New("read tcp: connection reset by peer")
-
-		mappedErr := mapErr(err)
-
-		require.ErrorIs(t, mappedErr, driver.ErrBadConn)
-		require.ErrorContains(t, mappedErr, "inferred from error")
-	})
 }

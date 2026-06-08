@@ -17,7 +17,7 @@ thrift:
 cli: usql
 
 usql: Makefile
-	go run github.com/sclgo/usqlgen@v0.8.0 -v build --get github.com/sclgo/impala-go@$(shell git branch --show-current || echo master) -- -tags impala
+	go run github.com/sclgo/usqlgen@v0.8.0 -v build --replace github.com/sclgo/impala-go=$$(pwd) -- -tags no_base,impala
 
 .PHONY: short-test
 short-test: ## Unit and other fast tests without dependencies without race detection (Windows-compatible)
