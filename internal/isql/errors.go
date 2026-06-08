@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/murfffi/gorich/helperr"
 	"github.com/samber/lo"
 	"github.com/sclgo/impala-go/internal/hive"
 )
@@ -32,16 +31,7 @@ func mapErr(err error) error {
 		}
 	}
 
-	// As a precaution, look for other indicators of ErrBadConn
-
 	if isOSBadConn(err) {
-		return wrapBadConn(err)
-	}
-
-	// Looking at go stdlib code, it seems that both "broken pipe" and "reset" are not
-	// specific error instances, so they can be checked only by message.
-	// Possibly, the reason is that those messages come from the OS.
-	if helperr.ContainsAny(err, "broken pipe", "connection reset by peer", "connection was aborted") {
 		return wrapBadConn(err)
 	}
 

@@ -23,6 +23,10 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    - name: Test WASM
+      run: |
+        make test-wasm
+
     - name: Test
       run: |
         make test-all
