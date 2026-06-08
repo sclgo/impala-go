@@ -14,6 +14,7 @@ func isOSBadConn(err error) bool {
 	}
 	//goland:noinspection ALL
 	res := errNo == syscall.ECONNRESET ||
-		errNo == syscall.ECONNABORTED
+		errNo == syscall.ECONNABORTED ||
+		errNo == syscall.EPIPE
 	return res // for debug breakpoints
 }

@@ -27,6 +27,11 @@ short-test: ## Unit and other fast tests without dependencies without race detec
 test-cli: usql
 	./usql -c "\drivers" | grep impala
 
+.PHONY: test-wasm
+test-wasm:
+	GOOS=js GOARCH=wasm go test -short -v -exec="$$(go env GOROOT)/lib/wasm/go_js_wasm_exec" ./...
+	GOOS=js GOARCH=wasm go build ./...
+
 .PHONY: test
 test: ## Unit and light integration tests without coverage or race detector (Windows-compatible)
 	go test -v -vet=all ./...

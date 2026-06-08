@@ -11,6 +11,8 @@ import (
 )
 
 func TestIsBadConn_Integration(t *testing.T) {
+	fi.SkipLongTest(t)
+
 	port, connections := createSocket(t)
 	clientConn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	require.NoError(t, err)
@@ -29,10 +31,8 @@ func createSocket(t *testing.T) (int, chan net.Conn) {
 	fi.CleanupF(t, listener.Close)
 	connections := make(chan net.Conn, 1)
 	go func() {
-		var lerr error
-		for lerr == nil {
-			var conn net.Conn
-			conn, lerr = listener.Accept()
+		conn, err := listener.Accept()
+		if err == nil {
 			connections <- conn
 		}
 	}()

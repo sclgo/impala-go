@@ -82,8 +82,8 @@ github.com/moby/sys/userns v0.1.0 h1:tVLXkFOxVu9A64/yh59slHVv9ahO9UIev4JZusOLG/g
 github.com/moby/sys/userns v0.1.0/go.mod h1:IHUYgu/kao6N8YZlp9Cf444ySSvCmDlmzUcYfDHOl28=
 github.com/moby/term v0.5.2 h1:6qk3FJAFDs6i/q3W/pQ97SX192qKfZgGjCQqfCJkgzQ=
 github.com/moby/term v0.5.2/go.mod h1:d3djjFCrjnB+fl8NJux+EJzu0msscUP+f8it8hPkFLc=
-github.com/murfffi/conncheck v0.2.0 h1:Ukw13MSt8IiuJtoRR1+7DyEWiiyvF0ajqHmS/TSekfo=
-github.com/murfffi/conncheck v0.2.0/go.mod h1:usNFFw6sh8ALxpaf+N/UhIz7zoPi5PiNLokNoEcC47c=
+github.com/murfffi/conncheck v0.2.1 h1:vCBEUWGrlKTUDWyKfAWIRft9aSImnEnkEWWvVaty5ko=
+github.com/murfffi/conncheck v0.2.1/go.mod h1:zZrtdDcEuDRuJBjne/qcJNF+hfiAcSbO6FquteRoE/c=
 github.com/murfffi/gorich v0.3.0 h1:cRsCCTD0A2eyiAjeSMwyOkjALDsVzgJO0ghY+cXsDJY=
 github.com/murfffi/gorich v0.3.0/go.mod h1:fozPmSzPmc1r0xnNtk3HE6xxxlzlBqo4rlChD/iJZcM=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
