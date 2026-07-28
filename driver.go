@@ -291,6 +291,9 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 	}
 
 	var transport thrift.TTransport
+	var conn net.Conn
+
+	// We take over dialing from Thrift for two reasons: use context, and pass the connection to checkedTransport.
 	if opts.UseTLS {
 
 		conf.TLSConfig, err = getTLSConfig(opts)
@@ -305,7 +308,7 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 			Config: conf.TLSConfig,
 		}
 
-		conn, err := dialer.DialContext(ctx, "tcp", hostPort)
+		conn, err = dialer.DialContext(ctx, "tcp", hostPort)
 		if err != nil {
 			var addInfo string
 			if opts.systemCAStoreSelected() {
@@ -314,15 +317,20 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 			return nil, nil, wrapConnectErr(ctx, err, addInfo)
 		}
 		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
-		transport = checkedTransport{
-			conn:       conn.(*tls.Conn), // type guaranteed by DialContext doc
-			TTransport: transport,
-		}
 	} else {
-		transport = thrift.NewTSocketConf(hostPort, conf)
-		if err := transport.Open(); err != nil {
+		dialer := net.Dialer{
+			Timeout: conf.GetConnectTimeout(),
+		}
+		conn, err = dialer.DialContext(ctx, "tcp", hostPort)
+		if err != nil {
 			return nil, nil, wrapConnectErr(ctx, err, "")
 		}
+		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
+	}
+
+	transport = checkedTransport{
+		conn:       conn, // type guaranteed by DialContext doc
+		TTransport: transport,
 	}
 
 	if opts.UseLDAP {

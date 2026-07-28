@@ -1,14 +1,15 @@
 package impala
 
 import (
-	"crypto/tls"
+	"net"
+	"runtime"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/murfffi/conncheck"
 )
 
 type checkedTransport struct {
-	conn *tls.Conn
+	conn net.Conn
 	thrift.TTransport
 }
 
@@ -22,6 +23,6 @@ var _ interface {
 } = checkedTransport{}
 
 func (t checkedTransport) IsOpen() bool {
-	// Due to THRIFT-5996, IsOpen on a TLS connection additionally needs murfffi/conncheck.
-	return t.TTransport.IsOpen() && conncheck.Do(t.conn) != conncheck.StatusNotOpen
+	// Due to THRIFT-6042, IsOpen on Windows additionally needs murfffi/conncheck.
+	return t.TTransport.IsOpen() && (runtime.GOOS != "windows" || conncheck.Do(t.conn) != conncheck.StatusNotOpen)
 }
