@@ -11,7 +11,6 @@ some [quite severe](https://github.com/sclgo/impala-go/pulls?q=is%3Apr+is%3Aclos
 The original codebase also didn't support Go modules.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/sclgo/impala-go.svg)](https://pkg.go.dev/github.com/sclgo/impala-go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sclgo/impala-go)](https://goreportcard.com/report/github.com/sclgo/impala-go)
 [![Tests](https://github.com/sclgo/impala-go/actions/workflows/ci.yml/badge.svg)](https://coveralls.io/github/sclgo/impala-go)
 [![Coverage Status](https://coveralls.io/repos/github/sclgo/impala-go/badge.svg)](https://coveralls.io/github/sclgo/impala-go)
 
