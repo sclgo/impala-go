@@ -4,9 +4,8 @@ package isql
 
 import "github.com/murfffi/gorich/helperr"
 
+// isOSBadConn tells if the given OS error means that the driver must return driver.ErrBadConn
+// This implementation is a fallback for rare platforms. Typically the code in oserr_unix and osserr_windows is used.
 func isOSBadConn(err error) bool {
-	// Looking at go stdlib code, it seems that both "broken pipe" and "reset" are not
-	// specific error instances, so they can be checked only by message.
-	// Possibly, the reason is that those messages come from the OS.
 	return helperr.ContainsAny(err, "broken pipe", "connection reset by peer", "connection was aborted")
 }

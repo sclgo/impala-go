@@ -7,6 +7,7 @@ import (
 	"syscall"
 )
 
+// isOSBadConn: see oserr_generic.go
 func isOSBadConn(err error) bool {
 	var errNo syscall.Errno
 	if !errors.As(err, &errNo) {
