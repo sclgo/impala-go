@@ -115,7 +115,7 @@ func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedVal
 	return res, mapErr(err)
 }
 
-// Begin is not supported
+// Begin is not supported as Impala itself doesn't support multi-statement transactions
 // Implements driver.Conn
 func (c *Conn) Begin() (driver.Tx, error) {
 	return nil, ErrNotSupported
@@ -134,8 +134,8 @@ func (c *Conn) OpenSession(ctx context.Context) (*hive.Session, error) {
 		c.session = session
 	} else {
 		// since we are just about to reuse the existing session, quickly check if the transport is still open,
-		// so we can return an error that database/sql/DB.retry can handle
-		// This check is on the hot path before any query so if it turns out to be too expensive it should be disabled.
+		// so we can return an error that database/sql/DB.retry can handle.
+		// This check is made before any query, so it should be disabled if it turns out to be too expensive.
 		if !c.isTransportOpen() {
 			return nil, fmt.Errorf("%w: underlying connection is not open", driver.ErrBadConn)
 		}
@@ -143,8 +143,10 @@ func (c *Conn) OpenSession(ctx context.Context) (*hive.Session, error) {
 	return c.session, nil
 }
 
-// ResetSession closes hive session
-// Implements driver.SessionResetter
+// ResetSession validates the connection and, optionally, closes the Hive session.
+//
+// Implements driver.SessionResetter.
+// Hive Session is closed only if Options.ReuseSession is false (default).
 func (c *Conn) ResetSession(ctx context.Context) (err error) {
 	if c.session != nil && !c.opts.ReuseSession {
 		err = mapErr(c.session.Close(ctx))
