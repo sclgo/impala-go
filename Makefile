@@ -122,10 +122,9 @@ check_vuln:
 # there is good discussion at https://news.ycombinator.com/item?id=42845323
 
 .PHONY: check_modern
+PKGS=$(shell go list ./... | grep -v "./internal/generated" | grep -v "./examples")
 check_modern:
-	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@v0.20.0 ./...
-# non-zero exit status on issues found
-# nb: to be replaced with go fix when 1.26 becomes minimal version i.e. when 1.27 is released
+	go fix -diff ${PKGS} | tee /dev/stderr | grep -q . && exit 1 || true
 
 # Tools targets
 
