@@ -195,7 +195,7 @@ are mapped to Go types as expected, with the following exceptions:
 * "Complex" types - MAP, STRUCT, ARRAY - are not supported. Impala itself has limited support for those.
   As a workaround, select individual fields or flatten such values within select statements.
 * Decimals are converted to strings
-  by [the Impala server API](https://github.com/apache/impala/blob/c5a0ec8/common/thrift/hive-1-api/TCLIService.thrift#L327).
+  by [the Impala server](https://github.com/apache/impala/blob/c5a0ec8/common/thrift/hive-1-api/TCLIService.thrift#L327).
   Either parse the decimal value after `Rows.Scan`,
   or use a custom [sql.Scanner](https://pkg.go.dev/database/sql#Scanner) implementation
   in `Row(s).Scan` e.g. `Decimal` from [github.com/cockroachdb/apd](https://github.com/cockroachdb/apd).
@@ -215,17 +215,32 @@ Additionally, the `Query` methods return early before all rows are retrieved.
 It is also supported to use a `QueryContext` method on a [sql.Conn](https://pkg.go.dev/database/sql#Conn)
 for a DDL/DML statement if you need the method to return before the statement completes.
 In that case, calling [Rows.Next](https://pkg.go.dev/database/sql#Rows.Next)
-will wait for the statement to complete and then return `false`.
+will wait for the statement to complete and then return `false`. Note that the Query methods in `database/sql`
+have built-in, undocumented [retry logic](https://www.solarwinds.com/blog/gos-connection-pool-retries-and-timeouts)
+which may be unwanted for DDL/DML operations.
 
-## Compatibility and Support
+## SQL parameters
+
+Impala does not natively support parameters in SQL statements. However, SQL parameters are 
+an important [standard SQL feature](https://go.dev/doc/database/sql-injection),
+so this drivers implements supports for `?` positional parameters - just like the first-party Impala and Hive Java drivers.
+
+The driver scans the SQL statement for literals which are exactly `?` and replaces them with the respective parameter
+value. Like in other databases and drivers, question marks are treated as placeholders for entire literals only. 
+`?` characters within string literals or quoted identifiers are not treated as parameter placeholders.
+
+As a legacy of the [github.com/bippio/go-impala](https://github.com/bippio/go-impala) code, the driver
+also supports Microsoft SQL server-style ordinal and named parameters, however the code for that
+is not that robust.
+
+## Compatibility
 
 The library is actively tested with Impala 4.4 and 3.4. All 3.x and 4.x minor
 versions should work well. 2.x is also supported on a best-effort basis.
 
 While Impala shares the majority of its API with Apache Hive, this driver doesn't support Hive.
-Instead, it is recommended to use a dedicated Hive driver or client.
-Please file an issue if you find it more valuable to use this driver with Hive compared to
-the existing drivers.
+Parts of the implementation intentionally use Impala-specific API.
+Use a dedicated driver or client with Hive like https://github.com/beltran/gohive.
 
 The library is *not* compatible with [TinyGo](https://tinygo.org/) because Thrift for Go
 doesn't support it. The Thrift code incompatible with TinyGo is not referenced by
@@ -233,6 +248,8 @@ impala-go but compilation fails nonetheless. Last checked with `tinygo 0.41.1`, 
 0.23`, and `Go 1.26` on `2026-05-10`. (Dev note: Any new release of Thrift or TinyGo may
 resolve the issue. Run `make test-tinygo` after updates to check again.) 
 Thrift team tracks progress on TinyGo support at <https://issues.apache.org/jira/browse/THRIFT-5209>.
+
+## Support
 
 File any issues that you encounter as GitHub issues.
 
