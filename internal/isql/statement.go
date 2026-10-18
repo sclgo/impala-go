@@ -77,14 +77,17 @@ func template(query string) string {
 	cntQuote := 0
 	cntDQuote := 0
 	cntBacktick := 0
+	escaped := false
 	for i := 0; i < len(query); i++ {
 		c := query[i]
+		if escaped {
+			sb.WriteByte(c)
+			escaped = false
+			continue
+		}
 		if c == '\\' {
 			sb.WriteByte(c)
-			if i+1 < len(query) {
-				sb.WriteByte(query[i+1])
-				i++
-			}
+			escaped = true
 			continue
 		}
 
