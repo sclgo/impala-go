@@ -81,9 +81,11 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 // PrepareContext returns prepared statement
 // Implements driver.ConnPrepareContext
 func (c *Conn) PrepareContext(_ context.Context, query string) (driver.Stmt, error) {
+	query, cnt := template(query)
 	return &Stmt{
-		conn: c,
-		stmt: query,
+		conn:     c,
+		stmt:     query,
+		numInput: cnt,
 	}, nil
 }
 
@@ -95,7 +97,7 @@ func (c *Conn) QueryContext(ctx context.Context, q string, args []driver.NamedVa
 		return nil, err
 	}
 
-	tmpl := template(q)
+	tmpl, _ := template(q)
 	stmt := statement(tmpl, args)
 	rows, err := query(ctx, session, stmt)
 	return rows, mapErr(err)
@@ -109,7 +111,7 @@ func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedVal
 		return nil, err
 	}
 
-	tmpl := template(q)
+	tmpl, _ := template(q)
 	stmt := statement(tmpl, args)
 	res, err := exec(ctx, session, stmt)
 	return res, mapErr(err)

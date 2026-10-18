@@ -12,9 +12,9 @@ import (
 
 // Stmt is statement
 type Stmt struct {
-	stmt string
-
-	conn *Conn
+	stmt     string
+	numInput int
+	conn     *Conn
 }
 
 // Close statement. No-op
@@ -24,11 +24,7 @@ func (s *Stmt) Close() error {
 
 // NumInput returns number of inputs
 func (s *Stmt) NumInput() int {
-	// -1 means the driver doesn't know how to count the number of
-	// placeholders, so (database/sql) won't sanity check input
-	// See https://cs.opensource.google/go/go/+/refs/tags/go1.23.4:src/database/sql/convert.go;l=109
-	// We could implement counting placeholders in the future.
-	return -1
+	return s.numInput
 }
 
 // Stmt does not need to implement https://pkg.go.dev/database/sql/driver#NamedValueChecker
@@ -62,9 +58,9 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 // Supports for ? placeholders mirrors the Hive and Impala JDBC drivers,
 // providing compatibility with them.
 // '?' inside string literals or identifiers are allowed and are not placeholders.
-func template(query string) string {
+func template(query string) (string, int) {
 	if !strings.Contains(query, "?") {
-		return query
+		return query, 0
 	}
 
 	// Docs:https://impala.apache.org/docs/build/html/topics/impala_literals.html
@@ -73,7 +69,7 @@ func template(query string) string {
 
 	var sb strings.Builder
 	sb.Grow(len(query))
-	ordinal := 1
+	ordinal := 0
 	cntQuote := 0
 	cntDQuote := 0
 	cntBacktick := 0
@@ -108,8 +104,8 @@ func template(query string) string {
 		case '?':
 			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
 				// Fprintf to strings.Builder can't return err
-				_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
 				ordinal++
+				_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
 				replaced = true
 			}
 		}
@@ -117,7 +113,7 @@ func template(query string) string {
 			sb.WriteByte(c)
 		}
 	}
-	return sb.String()
+	return sb.String(), ordinal
 }
 
 func statement(tmpl string, args []driver.NamedValue) string {
