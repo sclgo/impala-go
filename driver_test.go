@@ -2,6 +2,8 @@ package impala
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql/driver"
 	"fmt"
 	"net"
@@ -185,4 +187,36 @@ func createUnresponsiveSocket(t *testing.T) int {
 		}
 	}()
 	return listener.Addr().(*net.TCPAddr).Port
+}
+
+func TestGetTLSConfig(t *testing.T) {
+	t.Run("default", func(t *testing.T) {
+		conf, err := getTLSConfig(&Options{TLSInsecureSkipVerify: true})
+		require.NoError(t, err)
+		require.True(t, conf.InsecureSkipVerify)
+		require.Nil(t, conf.CipherSuites)
+		require.Nil(t, conf.RootCAs)
+	})
+	t.Run("custom config is used as base and not modified", func(t *testing.T) {
+		base := &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			ServerName:   "impala.example.com",
+			CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+		}
+		conf, err := getTLSConfig(&Options{TLSConfig: base, TLSInsecureSkipVerify: true})
+		require.NoError(t, err)
+		require.NotSame(t, base, conf)
+		require.Equal(t, uint16(tls.VersionTLS12), conf.MinVersion)
+		require.Equal(t, "impala.example.com", conf.ServerName)
+		require.Equal(t, []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384}, conf.CipherSuites)
+		require.True(t, conf.InsecureSkipVerify)
+		require.False(t, base.InsecureSkipVerify)
+	})
+	t.Run("CA certificate overrides custom root CAs", func(t *testing.T) {
+		base := &tls.Config{RootCAs: x509.NewCertPool()}
+		conf, err := getTLSConfig(&Options{TLSConfig: base, CACertPath: "functest/testssl/localhost.crt"})
+		require.NoError(t, err)
+		require.NotSame(t, base.RootCAs, conf.RootCAs)
+		require.False(t, conf.RootCAs.Equal(base.RootCAs))
+	})
 }

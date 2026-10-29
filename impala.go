@@ -1,6 +1,7 @@
 package impala
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"io"
 	"time"
@@ -41,6 +42,11 @@ type Options struct {
 	// TlsInsecureSkipVerify configures the tls.Config InsecureSkipVerify flag for
 	// a TLS connection to Impala. Behaves the same way as AllowSelfSignedCerts in the official JDBC driver.
 	TLSInsecureSkipVerify bool
+
+	// TLSConfig is an optional base configuration for a TLS connection to Impala, e.g. to set
+	// CipherSuites, MinVersion or client certificates. The driver uses a clone of it;
+	// TLSInsecureSkipVerify and CACertPath are applied on top. It can't be set in a DSN.
+	TLSConfig *tls.Config
 
 	BufferSize int
 	BatchSize  int

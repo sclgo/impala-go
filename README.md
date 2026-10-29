@@ -150,6 +150,7 @@ func main() {
 	// enable TLS
 	//opts.UseTLS = true
 	//opts.CACertPath = "/path/to/cacert"
+	//opts.TLSConfig = &tls.Config{...} // optional base TLS config, not available in the DSN
 
 	connector := impala.NewConnector(&opts)
 	db := sql.OpenDB(connector)
