@@ -190,6 +190,12 @@ func createUnresponsiveSocket(t *testing.T) int {
 }
 
 func TestGetTLSConfig(t *testing.T) {
+	t.Run("zero options", func(t *testing.T) {
+		conf, err := getTLSConfig(&Options{})
+		require.NoError(t, err)
+		require.False(t, conf.InsecureSkipVerify)
+		require.Nil(t, conf.RootCAs)
+	})
 	t.Run("default", func(t *testing.T) {
 		conf, err := getTLSConfig(&Options{TLSInsecureSkipVerify: true})
 		require.NoError(t, err)
@@ -219,4 +225,95 @@ func TestGetTLSConfig(t *testing.T) {
 		require.NotSame(t, base.RootCAs, conf.RootCAs)
 		require.False(t, conf.RootCAs.Equal(base.RootCAs))
 	})
+}
+
+func TestSystemCAStoreSelected(t *testing.T) {
+	require.True(t, (&Options{}).systemCAStoreSelected())
+	require.True(t, (&Options{TLSConfig: &tls.Config{}}).systemCAStoreSelected())
+	require.False(t, (&Options{CACertPath: "ca.crt"}).systemCAStoreSelected())
+	require.False(t, (&Options{TLSInsecureSkipVerify: true}).systemCAStoreSelected())
+	require.False(t, (&Options{TLSConfig: &tls.Config{RootCAs: x509.NewCertPool()}}).systemCAStoreSelected())
+}
+
+func TestOpenTransport_TLSConfig(t *testing.T) {
+	fi.SkipLongTest(t)
+
+	const certPath = "functest/testssl/localhost.crt"
+	// the test certificate is valid only for the DNS name "localhost"
+	port, states := startTLSServer(t, certPath, "functest/testssl/localhost.key")
+	tlsOpts := func(conf *tls.Config) *Options {
+		return &Options{Host: "127.0.0.1", Port: port, UseTLS: true, CACertPath: certPath, TLSConfig: conf}
+	}
+
+	t.Run("custom settings reach the handshake", func(t *testing.T) {
+		transport, _, err := openTransport(context.Background(), tlsOpts(&tls.Config{
+			ServerName:   "localhost",
+			MaxVersion:   tls.VersionTLS12,
+			CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
+		}))
+		require.NoError(t, err)
+		fi.CleanupF(t, transport.Close)
+		state := receiveState(t, states)
+		require.Equal(t, "localhost", state.ServerName)
+		require.Equal(t, uint16(tls.VersionTLS12), state.Version)
+		require.Equal(t, tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, state.CipherSuite)
+	})
+
+	t.Run("server name defaults to host", func(t *testing.T) {
+		_, _, err := openTransport(context.Background(), tlsOpts(nil))
+		var verifyErr *tls.CertificateVerificationError
+		require.ErrorAs(t, err, &verifyErr)
+	})
+
+	t.Run("insecure skip verify in TLSConfig is overridden", func(t *testing.T) {
+		opts := tlsOpts(&tls.Config{ServerName: "localhost", InsecureSkipVerify: true})
+		opts.CACertPath = ""
+		_, _, err := openTransport(context.Background(), opts)
+		var verifyErr *tls.CertificateVerificationError
+		require.ErrorAs(t, err, &verifyErr)
+		require.ErrorContains(t, err, "using system root CAs")
+	})
+
+	t.Run("custom root CAs are not reported as system root CAs", func(t *testing.T) {
+		opts := tlsOpts(&tls.Config{ServerName: "localhost", RootCAs: x509.NewCertPool()})
+		opts.CACertPath = ""
+		_, _, err := openTransport(context.Background(), opts)
+		var verifyErr *tls.CertificateVerificationError
+		require.ErrorAs(t, err, &verifyErr)
+		require.NotContains(t, err.Error(), "using system root CAs")
+	})
+}
+
+// startTLSServer starts a TLS server that completes handshakes and reports their connection state.
+func startTLSServer(t *testing.T, certPath, keyPath string) (string, <-chan tls.ConnectionState) {
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	require.NoError(t, err)
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{cert}})
+	require.NoError(t, err)
+	fi.CleanupF(t, listener.Close)
+	states := make(chan tls.ConnectionState, 10)
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			tlsConn := conn.(*tls.Conn)
+			if tlsConn.Handshake() == nil {
+				states <- tlsConn.ConnectionState()
+			}
+			_ = conn.Close()
+		}
+	}()
+	return strconv.Itoa(listener.Addr().(*net.TCPAddr).Port), states
+}
+
+func receiveState(t *testing.T, states <-chan tls.ConnectionState) tls.ConnectionState {
+	select {
+	case state := <-states:
+		return state
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not complete a TLS handshake")
+		return tls.ConnectionState{}
+	}
 }

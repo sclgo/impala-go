@@ -43,9 +43,13 @@ type Options struct {
 	// a TLS connection to Impala. Behaves the same way as AllowSelfSignedCerts in the official JDBC driver.
 	TLSInsecureSkipVerify bool
 
-	// TLSConfig is an optional base configuration for a TLS connection to Impala, e.g. to set
-	// CipherSuites, MinVersion or client certificates. The driver uses a clone of it;
-	// TLSInsecureSkipVerify and CACertPath are applied on top. It can't be set in a DSN.
+	// TLSConfig is an optional base configuration for a TLS connection to Impala, used only when UseTLS
+	// is true, e.g. to set CipherSuites, MinVersion, ServerName or client certificates (mutual TLS).
+	// The driver clones it for every connection and never modifies the original.
+	// TLSInsecureSkipVerify always overrides TLSConfig.InsecureSkipVerify, and CACertPath, when set,
+	// replaces TLSConfig.RootCAs. To replace the default certificate verification with
+	// VerifyConnection or VerifyPeerCertificate, set TLSInsecureSkipVerify.
+	// It can't be set in a DSN.
 	TLSConfig *tls.Config
 
 	BufferSize int
@@ -72,7 +76,7 @@ type Options struct {
 }
 
 func (o *Options) systemCAStoreSelected() bool {
-	return o.CACertPath == "" && !o.TLSInsecureSkipVerify
+	return o.CACertPath == "" && !o.TLSInsecureSkipVerify && (o.TLSConfig == nil || o.TLSConfig.RootCAs == nil)
 }
 
 var (
