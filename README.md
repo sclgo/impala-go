@@ -51,6 +51,8 @@ Driver name is `impala`.
 * `tls-insecure-skip-verify` - boolean. Disables TLS certificate verification by enabling the 
   [tls.Config.InsecureSkipVerify](https://pkg.go.dev/crypto/tls#Config.InsecureSkipVerify) option.
   Behaves the same way as `AllowSelfSignedCerts` in the official JDBC driver.
+  Other TLS settings, e.g. cipher suites, TLS versions, client certificates or server name, can be set in code with
+  `Options.TLSConfig`.
 * `reuse-session` - boolean. Disables resetting the session when `database/sql` requests it.
   When this setting is enabled, this driver behaves consistently with the other DB drivers
   in the ecosystem but diverges somewhat from documented database/sql behavior.
@@ -150,6 +152,7 @@ func main() {
 	// enable TLS
 	//opts.UseTLS = true
 	//opts.CACertPath = "/path/to/cacert"
+	//opts.TLSConfig = &tls.Config{...} // optional base TLS config (import "crypto/tls"), not available in the DSN
 
 	connector := impala.NewConnector(&opts)
 	db := sql.OpenDB(connector)

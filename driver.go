@@ -365,9 +365,11 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 }
 
 func getTLSConfig(opts *Options) (*tls.Config, error) {
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: opts.TLSInsecureSkipVerify,
+	tlsConfig := &tls.Config{}
+	if opts.TLSConfig != nil {
+		tlsConfig = opts.TLSConfig.Clone()
 	}
+	tlsConfig.InsecureSkipVerify = opts.TLSInsecureSkipVerify
 	if certPath := opts.CACertPath; !opts.TLSInsecureSkipVerify && certPath != "" {
 		caCertPool, err := readCert(certPath)
 		if err != nil {
