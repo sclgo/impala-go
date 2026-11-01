@@ -247,8 +247,8 @@ Use a dedicated driver or client with Hive like https://github.com/beltran/gohiv
 
 The library is *not* compatible with [TinyGo](https://tinygo.org/) because Thrift for Go
 doesn't support it. The Thrift code incompatible with TinyGo is not referenced by
-impala-go but compilation fails nonetheless. Last checked with `tinygo 0.41.1`, `thrift
-0.23`, and `Go 1.26` on `2026-05-10`. (Dev note: Any new release of Thrift or TinyGo may
+impala-go but compilation fails nonetheless. Last checked with `tinygo 0.44.1`, `thrift
+0.24`, and `Go 1.27` on `2026-11-01`. (Dev note: Any new release of Thrift or TinyGo may
 resolve the issue. Run `make test-tinygo` after updates to check again.) 
 Thrift team tracks progress on TinyGo support at <https://issues.apache.org/jira/browse/THRIFT-5209>.
 
