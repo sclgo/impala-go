@@ -112,6 +112,9 @@ inspired by [psql](https://www.postgresql.org/docs/current/app-psql.html).
 where DSN is a data source name in the format above. Review the `usql` [documentation](https://github.com/xo/usql#readme)
 for other options.
 
+`usql` users must set `reuse-session=true` in the DSN if they use `SET` statements to change connection-level Impala configuration.
+See [reuse-sessions docs](https://pkg.go.dev/github.com/sclgo/impala-go#Options.ReuseSession) for details.
+
 The latest version of `usql` typically comes with the latest version of `impala-go` but if you need to use a different one,
 you can prepare a custom build using [usqlgen](https://github.com/sclgo/usqlgen). For example, the following command
 builds a `usql` binary in the working directory using `impala-go` from `master` branch:
