@@ -13,7 +13,7 @@ import (
 // Client represents Hive Client
 type Client struct {
 	client impalaservice.ImpalaHiveServer2Service
-	opts   *Options
+	opts   Options
 	log    *log.Logger
 }
 
@@ -26,6 +26,8 @@ type Options struct {
 	// QueryTimeout in seconds - for QUERY_TIMEOUT_S session configuration value
 	// https://impala.apache.org/docs/build/html/topics/impala_query_timeout_s.html
 	QueryTimeout int
+	// Username for authorization
+	Username string
 }
 
 // NewClient creates Hive Client
@@ -33,7 +35,7 @@ func NewClient(client thrift.TClient, log *log.Logger, opts *Options) *Client {
 	return &Client{
 		client: impalaservice.NewImpalaHiveServer2ServiceClient(client),
 		log:    log,
-		opts:   opts,
+		opts:   *opts,
 	}
 }
 
@@ -48,6 +50,10 @@ func (c *Client) OpenSession(ctx context.Context) (*Session, error) {
 	req := cli_service.TOpenSessionReq{
 		ClientProtocol: cli_service.TProtocolVersion_HIVE_CLI_SERVICE_PROTOCOL_V7,
 		Configuration:  cfg,
+	}
+
+	if c.opts.Username != "" {
+		req.Username = &c.opts.Username
 	}
 
 	resp, err := c.client.OpenSession(ctx, &req)

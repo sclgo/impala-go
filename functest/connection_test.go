@@ -40,6 +40,7 @@ import (
 )
 
 var (
+	impala3User = url.User("impala")
 	impala4User = url.UserPassword("fry", "fry")
 )
 
@@ -78,6 +79,7 @@ func TestIntegration_Impala3(t *testing.T) {
 	fi.SkipLongTest(t)
 	dsn := startImpala3(t)
 	runSuite(t, dsn)
+	runUserTest(t, dsn, impala3User)
 }
 
 // TestIntegration_Impala4 covers integration with Impala 4.x and TLS
@@ -86,6 +88,7 @@ func TestIntegration_Impala4(t *testing.T) {
 	dsn := startImpala4(t)
 	runSuite(t, dsn)
 	runImpala4SpecificTests(t, dsn)
+	runUserTest(t, dsn, impala4User)
 }
 
 func TestIntegration_Restart(t *testing.T) {
@@ -368,6 +371,18 @@ func runErrorCases(t *testing.T, db *sql.DB) {
 	})
 }
 
+func runUserTest(t *testing.T, dsn string, user *url.Userinfo) {
+	db := fi.NoError(sql.Open("impala", dsn)).Require(t)
+	defer fi.NoErrorF(db.Close, t)
+
+	t.Run("username", func(t *testing.T) {
+		row := db.QueryRow("select user()")
+		var username *string
+		require.NoError(t, row.Scan(&username))
+		require.Equal(t, user.Username(), lo.FromPtr(username))
+	})
+}
+
 // testConnState verifies that the connection created db.Conn matches 1:1
 // to an Impala connection so connection-scoped state persists across calls
 func testConnState(t *testing.T, db *sql.DB) {
@@ -456,7 +471,7 @@ func runImpala4SpecificTests(t *testing.T, dsn string) {
 func startImpala3(t *testing.T) string {
 	ctx := context.Background()
 	c := fi.NoError(Setup(ctx)).Require(t)
-	dsn := getDsn(ctx, t, c, url.User("impala"))
+	dsn := getDsn(ctx, t, c, impala3User)
 	t.Cleanup(func() {
 		err := c.Terminate(ctx)
 		assert.NoError(t, err)
