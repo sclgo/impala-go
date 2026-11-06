@@ -274,7 +274,7 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 
 func testNumInput(t *testing.T, db *sql.DB) {
 	t.Run("not enough", func(t *testing.T) {
-		st, err := db.Prepare("select 1 as a where a = ?")
+		st, err := db.Prepare("select ? as a")
 		require.NoError(t, err)
 		defer fi.NoErrorF(st.Close, t)
 		_, err = st.Exec()
@@ -282,7 +282,7 @@ func testNumInput(t *testing.T, db *sql.DB) {
 	})
 
 	t.Run("just enough", func(t *testing.T) {
-		st, err := db.Prepare("select 1 as a where a = ?")
+		st, err := db.Prepare("select ? as a")
 		require.NoError(t, err)
 		defer fi.NoErrorF(st.Close, t)
 		_, err = st.Exec(1)
@@ -291,7 +291,7 @@ func testNumInput(t *testing.T, db *sql.DB) {
 	})
 
 	t.Run("named", func(t *testing.T) {
-		st, err := db.Prepare("select 1 as a where a = @a")
+		st, err := db.Prepare("select @a as a")
 		require.NoError(t, err)
 		defer fi.NoErrorF(st.Close, t)
 		_, err = st.Exec(sql.Named("a", 1))
