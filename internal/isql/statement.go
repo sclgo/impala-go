@@ -54,11 +54,18 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	return s.conn.ExecContext(ctx, s.stmt, args)
 }
 
+type paramMap struct {
+	byName map[string]any
+	byOrd  map[int]any
+}
+
 // template replaces all ? placeholders with ordinal placeholders
 // Supports for ? placeholders mirrors the Hive and Impala JDBC drivers,
 // providing compatibility with them.
 // '?' inside string literals or identifiers are allowed and are not placeholders.
-func template(query string) (string, int) {
+//
+// If paramMap is set, template also replaces ordinal and named placeholders.
+func template(query string, params *paramMap) (string, int) {
 	if !strings.Contains(query, "?") {
 		return query, 0
 	}
