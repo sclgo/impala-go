@@ -64,7 +64,7 @@ type paramMap struct {
 // providing compatibility with them.
 // '?' inside string literals or identifiers are allowed and are not placeholders.
 //
-// If paramMap is set, template also replaces ordinal and named placeholders.
+// In this final code, if paramMap is set, template also replaces ordinal and named placeholders.
 func template(query string, params *paramMap) (string, int) {
 	if !strings.Contains(query, "?") {
 		return query, 0
