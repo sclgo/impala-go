@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/sclgo/impala-go/internal/hive"
@@ -12,9 +13,9 @@ import (
 
 // Stmt is statement
 type Stmt struct {
-	stmt string
-
-	conn *Conn
+	stmt     string
+	numInput int
+	conn     *Conn
 }
 
 // Close statement. No-op
@@ -24,11 +25,7 @@ func (s *Stmt) Close() error {
 
 // NumInput returns number of inputs
 func (s *Stmt) NumInput() int {
-	// -1 means the driver doesn't know how to count the number of
-	// placeholders, so (database/sql) won't sanity check input
-	// See https://cs.opensource.google/go/go/+/refs/tags/go1.23.4:src/database/sql/convert.go;l=109
-	// We could implement counting placeholders in the future.
-	return -1
+	return s.numInput
 }
 
 // Stmt does not need to implement https://pkg.go.dev/database/sql/driver#NamedValueChecker
@@ -58,33 +55,41 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	return s.conn.ExecContext(ctx, s.stmt, args)
 }
 
+type paramMap struct {
+	byName map[string]any
+	byOrd  map[int]any
+}
+
 // template replaces all ? placeholders with ordinal placeholders
 // Supports for ? placeholders mirrors the Hive and Impala JDBC drivers,
 // providing compatibility with them.
 // '?' inside string literals or identifiers are allowed and are not placeholders.
-func template(query string) string {
-	if !strings.Contains(query, "?") {
-		return query
-	}
-
+//
+// If paramMap is set, template also replaces ordinal and named placeholders.
+func template(query string, params *paramMap) (string, int) {
 	// Docs:https://impala.apache.org/docs/build/html/topics/impala_literals.html
 	// https://impala.apache.org/docs/build/html/topics/impala_identifiers.html
 	// JDBC impl:https://github.com/apache/hive/blob/83d98f42fc7/jdbc/src/java/org/apache/hive/jdbc/HivePreparedStatement.java#L141
 
+	noCount := false
+
 	var sb strings.Builder
 	sb.Grow(len(query))
-	ordinal := 1
+	ordinal := 0
 	cntQuote := 0
 	cntDQuote := 0
 	cntBacktick := 0
+	escaped := false
 	for i := 0; i < len(query); i++ {
 		c := query[i]
+		if escaped {
+			sb.WriteByte(c)
+			escaped = false
+			continue
+		}
 		if c == '\\' {
 			sb.WriteByte(c)
-			if i+1 < len(query) {
-				sb.WriteByte(query[i+1])
-				i++
-			}
+			escaped = true
 			continue
 		}
 
@@ -105,16 +110,60 @@ func template(query string) string {
 		case '?':
 			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
 				// Fprintf to strings.Builder can't return err
-				_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
 				ordinal++
+				var val any
+				if params != nil {
+					val = params.byOrd[ordinal]
+				}
+				if val != nil {
+					_, _ = fmt.Fprintf(&sb, "%v", val)
+				} else {
+					_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
+				}
 				replaced = true
+			}
+		case '@':
+			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
+				noCount = true
+				if params != nil && i < len(query)-1 {
+					i++
+					loc := regexp.MustCompile("\\w\\b").FindStringIndex(query[i:])
+					paramId := query[i : i+loc[1]]
+					replaced = tryReplaceParam(paramId, &sb, params)
+					if replaced {
+						i = i + loc[0]
+					}
+				}
 			}
 		}
 		if !replaced {
 			sb.WriteByte(c)
 		}
 	}
-	return sb.String()
+	if noCount {
+		ordinal = -1
+	}
+	return sb.String(), ordinal
+}
+
+func tryReplaceParam(paramId string, sb *strings.Builder, params *paramMap) bool {
+	if paramId == "" {
+		return false
+	}
+
+	if paramId[0] == 'p' {
+		if ord, err := strconv.Atoi(paramId); err == nil && params.byOrd[ord] != nil {
+			_, _ = fmt.Fprintf(sb, "%v", params.byOrd[ord])
+			return true
+		}
+	}
+
+	if val := params.byName[paramId]; val != nil {
+		_, _ = fmt.Fprintf(sb, "%v", val)
+		return true
+	}
+
+	return false
 }
 
 func statement(tmpl string, args []driver.NamedValue) string {

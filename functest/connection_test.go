@@ -267,6 +267,37 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 	t.Run("decimal support", func(t *testing.T) {
 		testDecimal(t, db)
 	})
+	t.Run("num input", func(t *testing.T) {
+		testNumInput(t, db)
+	})
+}
+
+func testNumInput(t *testing.T, db *sql.DB) {
+	t.Run("not enough", func(t *testing.T) {
+		st, err := db.Prepare("select ? as a")
+		require.NoError(t, err)
+		defer fi.NoErrorF(st.Close, t)
+		_, err = st.Exec()
+		require.ErrorContains(t, err, "sql: expected 1 arguments, got 0")
+	})
+
+	t.Run("just enough", func(t *testing.T) {
+		st, err := db.Prepare("select ? as a")
+		require.NoError(t, err)
+		defer fi.NoErrorF(st.Close, t)
+		_, err = st.Exec(1)
+		require.NoError(t, err)
+
+	})
+
+	t.Run("named", func(t *testing.T) {
+		st, err := db.Prepare("select @a as a")
+		require.NoError(t, err)
+		defer fi.NoErrorF(st.Close, t)
+		_, err = st.Exec(sql.Named("a", 1))
+		require.NoError(t, err)
+	})
+
 }
 
 func testSet(t *testing.T, db *sql.DB, dsn string) {
