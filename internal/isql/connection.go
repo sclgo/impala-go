@@ -118,7 +118,10 @@ func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedVal
 }
 
 func toMap(args []driver.NamedValue) *paramMap {
-	res := &paramMap{}
+	res := &paramMap{
+		byName: make(map[string]any),
+		byOrd:  make(map[int]any),
+	}
 	for _, arg := range args {
 		if arg.Name != "" {
 			res.byName[arg.Name] = arg.Value
