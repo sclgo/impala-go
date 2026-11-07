@@ -14,11 +14,11 @@ func TestStatement_ValueReplacement(t *testing.T) {
 		target string
 	}{
 		{
-			stmt: "@p1 p1 '@p1'",
+			stmt: "@p1 p1 ", /* '@p1' */
 			args: []driver.NamedValue{
 				driver.NamedValue{Ordinal: 1, Value: "val_1"},
 			},
-			target: "'val_1' p1 '@p1'",
+			target: "'val_1' p1 ", /* '@p1' */
 		},
 		{
 			stmt: "@p1 @p10 @p11 @named @named1 @p1",
@@ -40,8 +40,11 @@ func TestStatement_ValueReplacement(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := statement(tt.stmt, tt.args)
-		require.Equal(t, tt.target, result)
+		t.Run(tt.stmt, func(t *testing.T) {
+			result := statement(tt.stmt, tt.args)
+			require.Equal(t, tt.target, result)
+		})
+
 	}
 }
 

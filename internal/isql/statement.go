@@ -112,7 +112,15 @@ func template(query string, params *paramMap) (string, int) {
 			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
 				// Fprintf to strings.Builder can't return err
 				ordinal++
-				_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
+				var val any
+				if params != nil {
+					val = params.byOrd[ordinal]
+				}
+				if val != nil {
+					_, _ = fmt.Fprintf(&sb, "%s", val)
+				} else {
+					_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
+				}
 				replaced = true
 			}
 		}

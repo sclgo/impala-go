@@ -81,7 +81,7 @@ func (c *Conn) Prepare(query string) (driver.Stmt, error) {
 // PrepareContext returns prepared statement
 // Implements driver.ConnPrepareContext
 func (c *Conn) PrepareContext(_ context.Context, query string) (driver.Stmt, error) {
-	query, cnt := template(query, nil)
+	_, cnt := template(query, nil)
 	return &Stmt{
 		conn:     c,
 		stmt:     query,
@@ -97,8 +97,8 @@ func (c *Conn) QueryContext(ctx context.Context, q string, args []driver.NamedVa
 		return nil, err
 	}
 
-	tmpl, _ := template(q, nil)
-	stmt := statement(tmpl, args)
+	argsMap := toMap(args)
+	stmt, _ := template(q, argsMap)
 	rows, err := query(ctx, session, stmt)
 	return rows, mapErr(err)
 }
@@ -111,10 +111,22 @@ func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedVal
 		return nil, err
 	}
 
-	tmpl, _ := template(q, nil)
-	stmt := statement(tmpl, args)
+	argsMap := toMap(args)
+	stmt, _ := template(q, argsMap)
 	res, err := exec(ctx, session, stmt)
 	return res, mapErr(err)
+}
+
+func toMap(args []driver.NamedValue) *paramMap {
+	res := &paramMap{}
+	for _, arg := range args {
+		if arg.Name != "" {
+			res.byName[arg.Name] = arg.Value
+		} else {
+			res.byOrd[arg.Ordinal] = arg.Value
+		}
+	}
+	return res
 }
 
 // Begin is not supported as Impala itself doesn't support multi-statement transactions
