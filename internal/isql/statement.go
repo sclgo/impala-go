@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/sclgo/impala-go/internal/hive"
@@ -66,13 +67,11 @@ type paramMap struct {
 //
 // If paramMap is set, template also replaces ordinal and named placeholders.
 func template(query string, params *paramMap) (string, int) {
-	if !strings.Contains(query, "?") {
-		return query, 0
-	}
-
 	// Docs:https://impala.apache.org/docs/build/html/topics/impala_literals.html
 	// https://impala.apache.org/docs/build/html/topics/impala_identifiers.html
 	// JDBC impl:https://github.com/apache/hive/blob/83d98f42fc7/jdbc/src/java/org/apache/hive/jdbc/HivePreparedStatement.java#L141
+
+	noCount := false
 
 	var sb strings.Builder
 	sb.Grow(len(query))
@@ -125,15 +124,46 @@ func template(query string, params *paramMap) (string, int) {
 			}
 		case '@':
 			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
-				// Disable replacement for now if there are @ params
-				return query, -1
+				noCount = true
+				if params != nil && i < len(query)-1 {
+					i++
+					loc := regexp.MustCompile("\\w\\b").FindStringIndex(query[i:])
+					paramId := query[i : i+loc[1]]
+					replaced = tryReplaceParam(paramId, &sb, params)
+					if replaced {
+						i = i + loc[0]
+					}
+				}
 			}
 		}
 		if !replaced {
 			sb.WriteByte(c)
 		}
 	}
+	if noCount {
+		ordinal = -1
+	}
 	return sb.String(), ordinal
+}
+
+func tryReplaceParam(paramId string, sb *strings.Builder, params *paramMap) bool {
+	if paramId == "" {
+		return false
+	}
+
+	if paramId[0] == 'p' {
+		if ord, err := strconv.Atoi(paramId); err == nil && params.byOrd[ord] != nil {
+			_, _ = fmt.Fprintf(sb, "%v", params.byOrd[ord])
+			return true
+		}
+	}
+
+	if val := params.byName[paramId]; val != nil {
+		_, _ = fmt.Fprintf(sb, "%v", val)
+		return true
+	}
+
+	return false
 }
 
 func statement(tmpl string, args []driver.NamedValue) string {
