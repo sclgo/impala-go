@@ -117,7 +117,7 @@ func template(query string, params *paramMap) (string, int) {
 					val = params.byOrd[ordinal]
 				}
 				if val != nil {
-					_, _ = fmt.Fprintf(&sb, "%s", val)
+					_, _ = fmt.Fprintf(&sb, "%v", val)
 				} else {
 					_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
 				}
