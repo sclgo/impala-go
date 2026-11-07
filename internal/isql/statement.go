@@ -123,6 +123,11 @@ func template(query string, params *paramMap) (string, int) {
 				}
 				replaced = true
 			}
+		case '@':
+			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
+				// Disable replacement for now if there are @ params
+				return query, -1
+			}
 		}
 		if !replaced {
 			sb.WriteByte(c)
