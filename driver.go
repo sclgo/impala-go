@@ -82,6 +82,12 @@ func (*Driver) Open(dsn string) (driver.Conn, error) {
 	return conn, nil
 }
 
+// ParseDSN reads a data source name as Driver.Open does, into the Options a Connector takes, so a client can
+// set what a DSN cannot, as DialContext or TLSConfig, on settings a DSN gave.
+func ParseDSN(dsn string) (*Options, error) {
+	return parseURI(dsn)
+}
+
 func parseURI(uri string) (*Options, error) {
 	u, err := url.Parse(uri)
 	if err != nil {

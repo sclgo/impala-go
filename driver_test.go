@@ -331,3 +331,15 @@ func TestOpenTransport_DialContext(t *testing.T) {
 	require.ErrorIs(t, err, ErrOpenFailed)
 	require.Equal(t, "tcp db.example:21050", dialed)
 }
+
+func TestParseDSN(t *testing.T) {
+	opts, err := ParseDSN("impala://fry:pw@db.example:21051?auth=ldap&tls=true")
+	require.NoError(t, err)
+	require.Equal(t, "db.example", opts.Host)
+	require.Equal(t, "21051", opts.Port)
+	require.Equal(t, "fry", opts.Username)
+	require.True(t, opts.UseLDAP)
+	require.True(t, opts.UseTLS)
+	_, err = ParseDSN("notimpala://")
+	require.ErrorIs(t, err, ErrBadDSN)
+}
