@@ -7,7 +7,13 @@ import (
 	"io"
 	"net"
 	"time"
+
+	"github.com/sclgo/impala-go/internal/hive"
 )
+
+// ServerError is a request the server refused: errors.As finds it in an error the driver returns, with the
+// server's message, SQLSTATE, and code.
+type ServerError = hive.StatusError
 
 func init() {
 	sql.Register("impala", &Driver{})
