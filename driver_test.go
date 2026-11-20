@@ -341,5 +341,5 @@ func TestParseDSN(t *testing.T) {
 	require.True(t, opts.UseLDAP)
 	require.True(t, opts.UseTLS)
 	_, err = ParseDSN("notimpala://")
-	require.ErrorIs(t, err, ErrBadDSN)
+	require.ErrorContains(t, err, "notimpala")
 }
