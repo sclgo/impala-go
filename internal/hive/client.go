@@ -21,6 +21,9 @@ type Client struct {
 // Options for Hive Client
 type Options struct {
 	MaxRows int64
+	// Username is sent with the session when the connection itself carries no user, as without LDAP,
+	// so the server runs the session as that user rather than as anonymous.
+	Username string
 	// MemLimit configures the MEM_LIMIT Impala property at session level
 	// https://impala.apache.org/docs/build/html/topics/impala_mem_limit.html
 	MemLimit string
@@ -67,6 +70,9 @@ func (c *Client) OpenSession(ctx context.Context) (*Session, error) {
 	req := cli_service.TOpenSessionReq{
 		ClientProtocol: cli_service.TProtocolVersion_HIVE_CLI_SERVICE_PROTOCOL_V7,
 		Configuration:  cfg,
+	}
+	if c.opts.Username != "" {
+		req.Username = &c.opts.Username
 	}
 
 	resp, err := c.client.OpenSession(ctx, &req)

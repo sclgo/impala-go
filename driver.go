@@ -270,6 +270,7 @@ func connect(ctx context.Context, opts *Options) (*isql.Conn, error) {
 	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
 	client := hive.NewClient(tclient, logger, &hive.Options{
 		MaxRows:          int64(opts.BatchSize),
+		Username:         lo.Ternary(opts.UseLDAP, "", opts.Username),
 		MemLimit:         opts.MemoryLimit,
 		QueryTimeout:     opts.QueryTimeout,
 		FetchRowsTimeout: fetchRowsTimeout(opts.SocketTimeout),
