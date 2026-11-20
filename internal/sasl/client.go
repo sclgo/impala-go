@@ -16,6 +16,10 @@ func NewClient(opts *Options) Client {
 }
 
 func (c *client) Start(mechlist []string) (string, []byte, bool, error) {
+	if c.opts.Mechanism != nil {
+		c.m = &external{opts: c.opts}
+		return c.m.Start()
+	}
 	for _, mech := range mechlist {
 		if newMech, ok := supported[mech]; ok {
 			c.m = newMech(c.opts)
@@ -44,4 +48,25 @@ type mech interface {
 type client struct {
 	m    mech
 	opts *Options
+}
+
+// external is the caller's Mechanism.
+type external struct {
+	opts *Options
+}
+
+func (m *external) Start() (string, []byte, bool, error) {
+	initial, err := m.opts.Mechanism.Start()
+	return m.opts.Mechanism.Name(), initial, false, err
+}
+
+func (m *external) Step(challenge []byte) ([]byte, bool, error) {
+	return m.opts.Mechanism.Step(challenge)
+}
+
+func (m *external) InterpretReceiveEOF(transportError error) error {
+	return &AuthError{
+		username:       m.opts.Username,
+		transportError: transportError,
+	}
 }

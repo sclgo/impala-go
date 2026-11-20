@@ -44,6 +44,12 @@ type Options struct {
 
 	UseLDAP bool
 
+	// SASL, when set, signs a connection in by the SASL mechanism it returns, in place of LDAP's PLAIN: GSSAPI,
+	// Kerberos's (RFC 4752), which the driver does not implement itself. It is called once a connection, whose
+	// negotiation the mechanism it returns holds. UseLDAP is ignored where it is set.
+	// It can't be set in a DSN.
+	SASL func() (SASLMechanism, error)
+
 	UseTLS     bool
 	CACertPath string
 

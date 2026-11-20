@@ -49,6 +49,9 @@ var (
 // reflect the process during which the error happened.
 type AuthError = sasl.AuthError
 
+// SASLMechanism is a SASL mechanism of the caller's, which Options.SASL returns for a connection.
+type SASLMechanism = sasl.Mechanism
+
 // Driver to Impala
 // DSN syntax: impala://[username[:password]@]host[:port][?param=value]
 // See Options for details about the parameters.
@@ -276,7 +279,7 @@ func connect(ctx context.Context, opts *Options) (*isql.Conn, error) {
 	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
 	client := hive.NewClient(tclient, logger, &hive.Options{
 		MaxRows:          int64(opts.BatchSize),
-		Username:         lo.Ternary(opts.UseLDAP, "", opts.Username),
+		Username:         lo.Ternary(opts.UseLDAP || opts.SASL != nil, "", opts.Username),
 		MemLimit:         opts.MemoryLimit,
 		QueryTimeout:     opts.QueryTimeout,
 		FetchRowsTimeout: fetchRowsTimeout(opts.SocketTimeout),
@@ -356,19 +359,26 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 		TTransport: transport,
 	}
 
-	if opts.UseLDAP {
+	if opts.SASL != nil || opts.UseLDAP {
 
-		if opts.Username == "" {
+		saslOpts := &sasl.Options{
+			Host:     opts.Host,
+			Username: opts.Username,
+			Password: opts.Password,
+		}
+		if opts.SASL != nil {
+			if saslOpts.Mechanism, err = opts.SASL(); err != nil {
+				_ = transport.Close()
+				return nil, nil, fmt.Errorf("%w: %w", ErrOpenFailed, err)
+			}
+		} else if opts.Username == "" {
+			_ = transport.Close()
 			return nil, nil, fmt.Errorf("%w: provide username for LDAP auth", ErrBadDSN)
 		}
 
 		// Empty password will be used if not provided.
 
-		transport, err = sasl.NewTSaslTransport(transport, &sasl.Options{
-			Host:     opts.Host,
-			Username: opts.Username,
-			Password: opts.Password,
-		})
+		transport, err = sasl.NewTSaslTransport(transport, saslOpts)
 
 		if err != nil {
 			// This never happens in the current version of thrift.
@@ -378,6 +388,7 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 
 		err = transport.Open()
 		if err != nil {
+			_ = transport.Close()
 			return nil, nil, fmt.Errorf("%w: authentication failed: %w", ErrOpenFailed, err)
 		}
 	} else {
