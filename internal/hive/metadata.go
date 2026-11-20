@@ -41,6 +41,7 @@ var (
 	dataTypeString   = reflect.TypeOf("")
 	dataTypeDateTime = reflect.TypeOf(time.Time{})
 	dataTypeRawBytes = reflect.TypeOf(sql.RawBytes{})
+	dataTypeBytes    = reflect.TypeOf([]byte{})
 	dataTypeUnknown  = reflect.TypeFor[any]()
 )
 
@@ -67,8 +68,10 @@ func typeOf(entry *cli_service.TPrimitiveTypeEntry) reflect.Type {
 		return dataTypeString
 	case cli_service.TTypeId_DATE_TYPE, cli_service.TTypeId_TIMESTAMP_TYPE:
 		return dataTypeDateTime
-	case cli_service.TTypeId_BINARY_TYPE, cli_service.TTypeId_ARRAY_TYPE,
-		cli_service.TTypeId_STRUCT_TYPE, cli_service.TTypeId_MAP_TYPE, cli_service.TTypeId_UNION_TYPE:
+	case cli_service.TTypeId_BINARY_TYPE:
+		return dataTypeBytes
+	case cli_service.TTypeId_ARRAY_TYPE, cli_service.TTypeId_STRUCT_TYPE, cli_service.TTypeId_MAP_TYPE,
+		cli_service.TTypeId_UNION_TYPE:
 		return dataTypeRawBytes
 	case cli_service.TTypeId_USER_DEFINED_TYPE:
 		return dataTypeUnknown

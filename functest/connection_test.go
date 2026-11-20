@@ -561,6 +561,7 @@ func testSelectOneIntoAny(t *testing.T, db *sql.DB) {
 		{sql: "cast('str' as char(10))", res: "str       "},
 		{sql: "cast('str' as varchar(100))", res: "str"},
 		{sql: "cast('2019-01-01 12:00:00' as timestamp)", res: sampletime},
+		{sql: "cast('bin' as binary)", res: []byte("bin")},
 		// confirms that fetch 0 rows with hasMoreRows = true is correctly handled
 		// relies on FETCH_ROWS_TIMEOUT_MS="1000", configured below
 		{sql: "sleep(2000)", res: true},

@@ -48,6 +48,19 @@ func TestResultSet(t *testing.T) {
 	})
 }
 
+func TestResultSet_Binary(t *testing.T) {
+	r := &results{data: []any{[]*cli_service.TColumn{{
+		BinaryVal: &cli_service.TBinaryColumn{Nulls: []byte{2}, Values: [][]byte{[]byte("bin"), nil}},
+	}}}}
+	rs := ResultSet{fetchfn: r.fetch, more: true, schema: &TableSchema{Columns: []*ColDesc{{DatabaseTypeName: "BINARY"}}}}
+	data := make([]driver.Value, 1)
+	require.NoError(t, rs.Next(data))
+	require.Equal(t, []byte("bin"), data[0])
+	require.NoError(t, rs.Next(data))
+	require.Nil(t, data[0])
+	require.Equal(t, io.EOF, rs.Next(data))
+}
+
 type results struct {
 	idx  int
 	data []any
