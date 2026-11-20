@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
-	"regexp"
+	"math"
+	"strconv"
 	"strings"
 
 	"github.com/sclgo/impala-go/internal/hive"
@@ -58,82 +59,175 @@ func (s *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	return s.conn.ExecContext(ctx, s.stmt, args)
 }
 
-// template replaces all ? placeholders with ordinal placeholders
-// Supports for ? placeholders mirrors the Hive and Impala JDBC drivers,
-// providing compatibility with them.
-// '?' inside string literals or identifiers are allowed and are not placeholders.
-func template(query string) string {
-	if !strings.Contains(query, "?") {
-		return query
+// bind writes the arguments into the statement as literals, since Impala has no server-side parameters.
+// Supports for ? placeholders mirrors the Hive and Impala JDBC drivers, providing compatibility with them;
+// @pN and @name are the ordinal and named forms. Placeholders inside string literals, quoted identifiers,
+// and comments are not placeholders. A statement without arguments is returned unchanged.
+//
+// Docs: https://impala.apache.org/docs/build/html/topics/impala_literals.html
+// https://impala.apache.org/docs/build/html/topics/impala_identifiers.html
+// JDBC impl: https://github.com/apache/hive/blob/83d98f42fc7/jdbc/src/java/org/apache/hive/jdbc/HivePreparedStatement.java#L141
+func bind(query string, args []driver.NamedValue) (string, error) {
+	if len(args) == 0 {
+		return query, nil
 	}
-
-	// Docs:https://impala.apache.org/docs/build/html/topics/impala_literals.html
-	// https://impala.apache.org/docs/build/html/topics/impala_identifiers.html
-	// JDBC impl:https://github.com/apache/hive/blob/83d98f42fc7/jdbc/src/java/org/apache/hive/jdbc/HivePreparedStatement.java#L141
 
 	var sb strings.Builder
 	sb.Grow(len(query))
-	ordinal := 1
-	cntQuote := 0
-	cntDQuote := 0
-	cntBacktick := 0
+	positional := 0
 	for i := 0; i < len(query); i++ {
 		c := query[i]
-		if c == '\\' {
+		switch {
+		case c == '\\':
 			sb.WriteByte(c)
 			if i+1 < len(query) {
-				sb.WriteByte(query[i+1])
 				i++
+				sb.WriteByte(query[i])
 			}
-			continue
-		}
-
-		var replaced bool
-		switch c {
-		case '"':
-			if cntQuote%2 == 0 && cntBacktick%2 == 0 {
-				cntDQuote++
+		case c == '\'' || c == '"' || c == '`':
+			end := quoteEnd(query, i)
+			sb.WriteString(query[i:end])
+			i = end - 1
+		case c == '-' && strings.HasPrefix(query[i:], "--"):
+			end := strings.IndexByte(query[i:], '\n')
+			if end < 0 {
+				end = len(query) - i
 			}
-		case '\'':
-			if cntDQuote%2 == 0 && cntBacktick%2 == 0 {
-				cntQuote++
+			sb.WriteString(query[i : i+end])
+			i += end - 1
+		case c == '/' && strings.HasPrefix(query[i:], "/*"):
+			end := strings.Index(query[i+2:], "*/")
+			if end < 0 {
+				end = len(query) - i
+			} else {
+				end += 4
 			}
-		case '`':
-			if cntQuote%2 == 0 && cntDQuote%2 == 0 {
-				cntBacktick++
+			sb.WriteString(query[i : i+end])
+			i += end - 1
+		case c == '?':
+			positional++
+			arg, ok := byOrdinal(args, positional)
+			if !ok {
+				return "", fmt.Errorf("%w: no argument for placeholder %d", ErrNotSupported, positional)
 			}
-		case '?':
-			if cntQuote%2 == 0 && cntDQuote%2 == 0 && cntBacktick%2 == 0 {
-				// Fprintf to strings.Builder can't return err
-				_, _ = fmt.Fprintf(&sb, "@p%d", ordinal)
-				ordinal++
-				replaced = true
+			lit, err := literal(arg.Value)
+			if err != nil {
+				return "", err
 			}
-		}
-		if !replaced {
+			sb.WriteString(lit)
+		case c == '@':
+			name := identifierAt(query, i+1)
+			arg, ok := byPlaceholder(args, name)
+			if !ok {
+				sb.WriteByte(c)
+				continue
+			}
+			lit, err := literal(arg.Value)
+			if err != nil {
+				return "", err
+			}
+			sb.WriteString(lit)
+			i += len(name)
+		default:
 			sb.WriteByte(c)
 		}
 	}
-	return sb.String()
+	return sb.String(), nil
 }
 
-func statement(tmpl string, args []driver.NamedValue) string {
-	stmt := tmpl
-	for _, arg := range args {
-		var re *regexp.Regexp
-		if arg.Name != "" {
-			re = regexp.MustCompile(fmt.Sprintf("@%s%s", arg.Name, `\b`))
-		} else {
-			re = regexp.MustCompile(fmt.Sprintf("@p%d%s", arg.Ordinal, `\b`))
+// quoteEnd returns the index just past the quoted text that starts at i, or the statement's end.
+func quoteEnd(query string, i int) int {
+	quote := query[i]
+	for j := i + 1; j < len(query); j++ {
+		switch query[j] {
+		case '\\':
+			if quote != '`' {
+				j++
+			}
+		case quote:
+			return j + 1
 		}
-		formatStr := "%v"
-		if _, ok := arg.Value.(string); ok {
-			formatStr = "'%v'"
-		}
-		val := fmt.Sprintf(formatStr, arg.Value)
-		stmt = re.ReplaceAllString(stmt, val)
 	}
-	return stmt
+	return len(query)
+}
+
+func identifierAt(query string, i int) string {
+	j := i
+	for j < len(query) && (query[j] == '_' || ('0' <= query[j] && query[j] <= '9') ||
+		('a' <= query[j] && query[j] <= 'z') || ('A' <= query[j] && query[j] <= 'Z')) {
+		j++
+	}
+	return query[i:j]
+}
+
+func byOrdinal(args []driver.NamedValue, ordinal int) (driver.NamedValue, bool) {
+	for _, arg := range args {
+		if arg.Name == "" && arg.Ordinal == ordinal {
+			return arg, true
+		}
+	}
+	return driver.NamedValue{}, false
+}
+
+func byPlaceholder(args []driver.NamedValue, name string) (driver.NamedValue, bool) {
+	if name == "" {
+		return driver.NamedValue{}, false
+	}
+	for _, arg := range args {
+		if arg.Name == name {
+			return arg, true
+		}
+	}
+	if ordinal, err := strconv.Atoi(strings.TrimPrefix(name, "p")); err == nil && strings.HasPrefix(name, "p") {
+		return byOrdinal(args, ordinal)
+	}
+	return driver.NamedValue{}, false
+}
+
+// literal renders a value as an Impala literal. A string's backslashes and single quotes are escaped with a
+// backslash, which is how Impala reads them inside single quotes.
+func literal(v any) (string, error) {
+	switch v := v.(type) {
+	case nil:
+		return "NULL", nil
+	case string:
+		return quote(v), nil
+	case []byte:
+		return quote(string(v)), nil
+	case bool:
+		if v {
+			return "TRUE", nil
+		}
+		return "FALSE", nil
+	case int64:
+		return strconv.FormatInt(v, 10), nil
+	case float64:
+		switch {
+		case math.IsNaN(v):
+			return "CAST('nan' AS DOUBLE)", nil
+		case math.IsInf(v, 1):
+			return "CAST('inf' AS DOUBLE)", nil
+		case math.IsInf(v, -1):
+			return "CAST('-inf' AS DOUBLE)", nil
+		}
+		return strconv.FormatFloat(v, 'g', -1, 64), nil
+	default:
+		return "", fmt.Errorf("%w: argument of type %T", ErrNotSupported, v)
+	}
+}
+
+func quote(s string) string {
+	var sb strings.Builder
+	sb.Grow(len(s) + 2)
+	sb.WriteByte('\'')
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' || s[i] == '\'' {
+			sb.WriteByte('\\')
+		}
+		sb.WriteByte(s[i])
+	}
+	sb.WriteByte('\'')
+	return sb.String()
 }
 
 func query(ctx context.Context, session *hive.Session, stmt string) (driver.Rows, error) {
