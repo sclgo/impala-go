@@ -208,18 +208,21 @@ func (op *Operation) Close(ctx context.Context) (int64, error) {
 	return calcRowsAffected(resp), nil
 }
 
+// calcRowsAffected counts the rows a statement changed. An Iceberg UPDATE reports each row twice, once
+// written and once as a position delete, and a DELETE reports its rows as deleted alone, so the count is the
+// larger of the two.
 func calcRowsAffected(resp *impalaservice.TCloseImpalaOperationResp) int64 {
 	if resp.DmlResult_ == nil {
 		return 0
 	}
-	var result int64
+	var modified, deleted int64
 	for _, v := range resp.DmlResult_.GetRowsModified() {
-		result += v
+		modified += v
 	}
 	for _, v := range resp.DmlResult_.GetRowsDeleted() {
-		result += v
+		deleted += v
 	}
-	return result
+	return max(modified, deleted)
 }
 
 // sleep sleeps in a context aware way
