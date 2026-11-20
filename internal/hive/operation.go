@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/sclgo/impala-go/internal/generated/cli_service"
 	"github.com/sclgo/impala-go/internal/generated/impalaservice"
 )
@@ -120,12 +119,30 @@ func (op *Operation) WaitToFinish(ctx context.Context) error {
 	opState, err := op.CheckStateAndStatus(ctx)
 	for err == nil && opState != cli_service.TOperationState_FINISHED_STATE {
 		sleep(ctx, duration)
+		if ctx.Err() != nil {
+			return op.cancel(ctx)
+		}
 		opState, err = op.CheckStateAndStatus(ctx)
-		// It is important to check ctx.Err() as Thrift almost always ignores context - at least up to v0.21.
-		err = lo.CoalesceOrEmpty(err, ctx.Err())
 		duration = nextDuration(duration)
 	}
 	return err
+}
+
+// cancel asks the server to stop the operation once ctx has ended, and returns ctx's error.
+// The connection stays usable: no call was abandoned part way (see detachedClient).
+func (op *Operation) cancel(ctx context.Context) error {
+	op.hive.log.Printf("cancel operation: %v", guid(op.h.OperationId.GUID))
+	req := cli_service.TCancelOperationReq{
+		OperationHandle: op.h,
+	}
+	resp, err := op.hive.client.CancelOperation(ctx, &req)
+	if err == nil {
+		err = checkStatus(resp)
+	}
+	if err != nil {
+		op.hive.log.Printf("cancel operation failed: %v", err)
+	}
+	return ctx.Err()
 }
 
 func fetch(ctx context.Context, op *Operation) (*cli_service.TFetchResultsResp, error) {
@@ -139,7 +156,6 @@ func fetch(ctx context.Context, op *Operation) (*cli_service.TFetchResultsResp, 
 	var duration time.Duration
 	fetchStatus := cli_service.TStatusCode_STILL_EXECUTING_STATUS
 	resp := &cli_service.TFetchResultsResp{}
-	// It is important to check ctx.Err() as Thrift almost always ignores context - at least up to v0.21.
 	for fetchStatus == cli_service.TStatusCode_STILL_EXECUTING_STATUS && ctx.Err() == nil {
 		// It is questionable if we need to back-off (sleep) in this case
 		// impala-shell doesn't - https://github.com/apache/impala/blob/1f35747/shell/impala_client.py#L958
@@ -160,8 +176,11 @@ func fetch(ctx context.Context, op *Operation) (*cli_service.TFetchResultsResp, 
 		fetchStatus = resp.GetStatus().StatusCode
 	}
 
+	if ctx.Err() != nil {
+		return nil, op.cancel(ctx)
+	}
 	op.hive.log.Printf("results: %v", resp.Results)
-	return resp, ctx.Err()
+	return resp, nil
 }
 
 func nextDuration(duration time.Duration) time.Duration {

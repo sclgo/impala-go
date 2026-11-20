@@ -269,14 +269,25 @@ func connect(ctx context.Context, opts *Options) (*isql.Conn, error) {
 
 	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
 	client := hive.NewClient(tclient, logger, &hive.Options{
-		MaxRows:      int64(opts.BatchSize),
-		MemLimit:     opts.MemoryLimit,
-		QueryTimeout: opts.QueryTimeout,
+		MaxRows:          int64(opts.BatchSize),
+		MemLimit:         opts.MemoryLimit,
+		QueryTimeout:     opts.QueryTimeout,
+		FetchRowsTimeout: fetchRowsTimeout(opts.SocketTimeout),
 	})
 
 	return isql.NewConn(client, transport, logger, isql.Options{
 		ReuseSession: opts.ReuseSession,
 	}), nil
+}
+
+// fetchRowsTimeout is how long the server may hold a fetch with no rows yet: a second, or half the socket
+// timeout where that is shorter, so a fetch of a slow query returns before the socket times out, and a
+// cancelled context is seen within about a second.
+func fetchRowsTimeout(socketTimeout time.Duration) time.Duration {
+	if socketTimeout > 0 && socketTimeout/2 < time.Second {
+		return max(socketTimeout/2, time.Millisecond)
+	}
+	return time.Second
 }
 
 func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thrift.TConfiguration, error) {

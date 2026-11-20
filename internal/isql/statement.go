@@ -238,6 +238,7 @@ func query(ctx context.Context, session *hive.Session, stmt string) (driver.Rows
 
 	schema, err := operation.GetResultSetMetadata(ctx)
 	if err != nil {
+		_, _ = operation.Close(ctx)
 		return nil, err
 	}
 
@@ -267,6 +268,7 @@ func exec(ctx context.Context, session *hive.Session, stmt string) (driver.Resul
 	// https://github.com/apache/impala/blob/aac375e/shell/impala_shell.py#L1412
 	err = operation.WaitToFinish(ctx)
 	if err != nil {
+		_, _ = operation.Close(ctx)
 		return nil, err
 	}
 
