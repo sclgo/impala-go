@@ -1,6 +1,6 @@
 module github.com/sclgo/impala-go/functest
 
-go 1.25.12
+go 1.26.10
 
 require (
 	github.com/cockroachdb/apd/v3 v3.2.3
@@ -66,4 +66,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/sclgo/impala-go v1.6.0 => ../
+replace github.com/sclgo/impala-go => ../
