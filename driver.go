@@ -304,40 +304,45 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 	var transport thrift.TTransport
 	var conn net.Conn
 
-	// We take over dialing from Thrift for two reasons: use context, and pass the connection to checkedTransport.
 	if opts.UseTLS {
-
 		conf.TLSConfig, err = getTLSConfig(opts)
 		if err != nil {
 			return nil, nil, err
 		}
-
-		dialer := tls.Dialer{
-			NetDialer: &net.Dialer{
-				Timeout: conf.GetConnectTimeout(),
-			},
-			Config: conf.TLSConfig,
+		if conf.TLSConfig.ServerName == "" {
+			conf.TLSConfig.ServerName = opts.Host
 		}
+	}
 
-		conn, err = dialer.DialContext(ctx, "tcp", hostPort)
-		if err != nil {
+	// We take over dialing from Thrift for two reasons: use context, and pass the connection to checkedTransport.
+	dial := opts.DialContext
+	if dial == nil {
+		dial = (&net.Dialer{Timeout: conf.GetConnectTimeout()}).DialContext
+	}
+	dialCtx := ctx
+	if timeout := conf.GetConnectTimeout(); timeout > 0 {
+		var cancel context.CancelFunc
+		dialCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	conn, err = dial(dialCtx, "tcp", hostPort)
+	if err != nil {
+		return nil, nil, wrapConnectErr(ctx, err, "")
+	}
+
+	if opts.UseTLS {
+		tlsConn := tls.Client(conn, conf.TLSConfig)
+		if err = tlsConn.HandshakeContext(dialCtx); err != nil {
+			_ = conn.Close()
 			var addInfo string
 			if opts.systemCAStoreSelected() {
 				addInfo = " (using system root CAs)"
 			}
 			return nil, nil, wrapConnectErr(ctx, err, addInfo)
 		}
-		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
-	} else {
-		dialer := net.Dialer{
-			Timeout: conf.GetConnectTimeout(),
-		}
-		conn, err = dialer.DialContext(ctx, "tcp", hostPort)
-		if err != nil {
-			return nil, nil, wrapConnectErr(ctx, err, "")
-		}
-		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
+		conn = tlsConn
 	}
+	transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
 
 	transport = checkedTransport{
 		conn:       conn, // type guaranteed by DialContext doc

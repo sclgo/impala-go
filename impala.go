@@ -1,9 +1,11 @@
 package impala
 
 import (
+	"context"
 	"crypto/tls"
 	"database/sql"
 	"io"
+	"net"
 	"time"
 )
 
@@ -73,6 +75,11 @@ type Options struct {
 
 	// ConnectTimeout configures the max wait for initial connection to server. 0 or negative value means no limit.
 	ConnectTimeout time.Duration
+
+	// DialContext, when set, opens the TCP connection to Host and Port in place of a net.Dialer, as through an
+	// SSH tunnel or a proxy. TLS, when enabled, runs over the connection it returns.
+	// It can't be set in a DSN.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 func (o *Options) systemCAStoreSelected() bool {
