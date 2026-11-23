@@ -49,6 +49,9 @@ var (
 // reflect the process during which the error happened.
 type AuthError = sasl.AuthError
 
+// SASLMechanism is a SASL mechanism of the caller's, which Options.SASL returns for a connection.
+type SASLMechanism = sasl.Mechanism
+
 // Driver to Impala
 // DSN syntax: impala://[username[:password]@]host[:port][?param=value]
 // See Options for details about the parameters.
@@ -80,6 +83,12 @@ func (*Driver) Open(dsn string) (driver.Conn, error) {
 		return nil, err
 	}
 	return conn, nil
+}
+
+// ParseDSN reads a data source name as Driver.Open does, into the Options a Connector takes, so a client can
+// set what a DSN cannot, as DialContext or TLSConfig, on settings a DSN gave.
+func ParseDSN(dsn string) (*Options, error) {
+	return parseURI(dsn)
 }
 
 func parseURI(uri string) (*Options, error) {
@@ -269,14 +278,26 @@ func connect(ctx context.Context, opts *Options) (*isql.Conn, error) {
 
 	logger := log.New(opts.LogOut, "impala: ", log.LstdFlags)
 	client := hive.NewClient(tclient, logger, &hive.Options{
-		MaxRows:      int64(opts.BatchSize),
-		MemLimit:     opts.MemoryLimit,
-		QueryTimeout: opts.QueryTimeout,
+		MaxRows:          int64(opts.BatchSize),
+		Username:         lo.Ternary(opts.UseLDAP || opts.SASL != nil, "", opts.Username),
+		MemLimit:         opts.MemoryLimit,
+		QueryTimeout:     opts.QueryTimeout,
+		FetchRowsTimeout: fetchRowsTimeout(opts.SocketTimeout),
 	})
 
 	return isql.NewConn(client, transport, logger, isql.Options{
 		ReuseSession: opts.ReuseSession,
 	}), nil
+}
+
+// fetchRowsTimeout is how long the server may hold a fetch with no rows yet: a second, or half the socket
+// timeout where that is shorter, so a fetch of a slow query returns before the socket times out, and a
+// cancelled context is seen within about a second.
+func fetchRowsTimeout(socketTimeout time.Duration) time.Duration {
+	if socketTimeout > 0 && socketTimeout/2 < time.Second {
+		return max(socketTimeout/2, time.Millisecond)
+	}
+	return time.Second
 }
 
 func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thrift.TConfiguration, error) {
@@ -293,59 +314,71 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 	var transport thrift.TTransport
 	var conn net.Conn
 
-	// We take over dialing from Thrift for two reasons: use context, and pass the connection to checkedTransport.
 	if opts.UseTLS {
-
 		conf.TLSConfig, err = getTLSConfig(opts)
 		if err != nil {
 			return nil, nil, err
 		}
-
-		dialer := tls.Dialer{
-			NetDialer: &net.Dialer{
-				Timeout: conf.GetConnectTimeout(),
-			},
-			Config: conf.TLSConfig,
+		if conf.TLSConfig.ServerName == "" {
+			conf.TLSConfig.ServerName = opts.Host
 		}
+	}
 
-		conn, err = dialer.DialContext(ctx, "tcp", hostPort)
-		if err != nil {
+	// We take over dialing from Thrift for two reasons: use context, and pass the connection to checkedTransport.
+	dial := opts.DialContext
+	if dial == nil {
+		dial = (&net.Dialer{Timeout: conf.GetConnectTimeout()}).DialContext
+	}
+	dialCtx := ctx
+	if timeout := conf.GetConnectTimeout(); timeout > 0 {
+		var cancel context.CancelFunc
+		dialCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	conn, err = dial(dialCtx, "tcp", hostPort)
+	if err != nil {
+		return nil, nil, wrapConnectErr(ctx, err, "")
+	}
+
+	if opts.UseTLS {
+		tlsConn := tls.Client(conn, conf.TLSConfig)
+		if err = tlsConn.HandshakeContext(dialCtx); err != nil {
+			_ = conn.Close()
 			var addInfo string
 			if opts.systemCAStoreSelected() {
 				addInfo = " (using system root CAs)"
 			}
 			return nil, nil, wrapConnectErr(ctx, err, addInfo)
 		}
-		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
-	} else {
-		dialer := net.Dialer{
-			Timeout: conf.GetConnectTimeout(),
-		}
-		conn, err = dialer.DialContext(ctx, "tcp", hostPort)
-		if err != nil {
-			return nil, nil, wrapConnectErr(ctx, err, "")
-		}
-		transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
+		conn = tlsConn
 	}
+	transport = thrift.NewTSSLSocketFromConnConf(conn, conf)
 
 	transport = checkedTransport{
 		conn:       conn, // type guaranteed by DialContext doc
 		TTransport: transport,
 	}
 
-	if opts.UseLDAP {
+	if opts.SASL != nil || opts.UseLDAP {
 
-		if opts.Username == "" {
+		saslOpts := &sasl.Options{
+			Host:     opts.Host,
+			Username: opts.Username,
+			Password: opts.Password,
+		}
+		if opts.SASL != nil {
+			if saslOpts.Mechanism, err = opts.SASL(); err != nil {
+				_ = transport.Close()
+				return nil, nil, fmt.Errorf("%w: %w", ErrOpenFailed, err)
+			}
+		} else if opts.Username == "" {
+			_ = transport.Close()
 			return nil, nil, fmt.Errorf("%w: provide username for LDAP auth", ErrBadDSN)
 		}
 
 		// Empty password will be used if not provided.
 
-		transport, err = sasl.NewTSaslTransport(transport, &sasl.Options{
-			Host:     opts.Host,
-			Username: opts.Username,
-			Password: opts.Password,
-		})
+		transport, err = sasl.NewTSaslTransport(transport, saslOpts)
 
 		if err != nil {
 			// This never happens in the current version of thrift.
@@ -355,6 +388,7 @@ func openTransport(ctx context.Context, opts *Options) (thrift.TTransport, *thri
 
 		err = transport.Open()
 		if err != nil {
+			_ = transport.Close()
 			return nil, nil, fmt.Errorf("%w: authentication failed: %w", ErrOpenFailed, err)
 		}
 	} else {

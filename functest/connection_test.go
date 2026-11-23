@@ -261,6 +261,14 @@ func runHappyCases(t *testing.T, db *sql.DB) {
 	t.Run("Insert", func(t *testing.T) {
 		testInsert(t, db)
 	})
+	t.Run("Parameters round trip", func(t *testing.T) {
+		for _, val := range []string{"O'Brien", `back\slash`, `\'; SELECT 1; --`, "@p2 ?", "line\nbreak"} {
+			var got string
+			err := db.QueryRow("SELECT ?, ?", val, "second").Scan(&got, new(string))
+			require.NoError(t, err)
+			require.Equal(t, val, got)
+		}
+	})
 	t.Run("Connection State", func(t *testing.T) {
 		testConnState(t, db)
 	})
@@ -352,6 +360,35 @@ func runErrorCases(t *testing.T, db *sql.DB) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Less(t, time.Since(startTime), 5*time.Second)
 
+	})
+
+	t.Run("Context Cancelled keeps the connection", func(t *testing.T) {
+		bkgCtx := context.Background()
+		conn, err := db.Conn(bkgCtx)
+		require.NoError(t, err)
+		defer fi.NoErrorF(conn.Close, t)
+		_, err = conn.ExecContext(bkgCtx, "CREATE TABLE IF NOT EXISTS default.cancel_keeps (b BOOLEAN)")
+		require.NoError(t, err)
+		for _, run := range []func(ctx context.Context) error{
+			func(ctx context.Context) error {
+				var val any
+				return conn.QueryRowContext(ctx, "SELECT SLEEP(10000)").Scan(&val)
+			},
+			func(ctx context.Context) error {
+				_, err := conn.ExecContext(ctx, "INSERT INTO default.cancel_keeps SELECT SLEEP(10000)")
+				return err
+			},
+		} {
+			startTime := time.Now()
+			ctx, cancel := context.WithTimeout(bkgCtx, 1*time.Second)
+			err = run(ctx)
+			cancel()
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			require.Less(t, time.Since(startTime), 5*time.Second)
+			var one int
+			require.NoError(t, conn.QueryRowContext(bkgCtx, "SELECT 1").Scan(&one))
+			require.Equal(t, 1, one)
+		}
 	})
 
 	t.Run("session expired", func(t *testing.T) {
@@ -524,6 +561,7 @@ func testSelectOneIntoAny(t *testing.T, db *sql.DB) {
 		{sql: "cast('str' as char(10))", res: "str       "},
 		{sql: "cast('str' as varchar(100))", res: "str"},
 		{sql: "cast('2019-01-01 12:00:00' as timestamp)", res: sampletime},
+		{sql: "cast('bin' as binary)", res: []byte("bin")},
 		// confirms that fetch 0 rows with hasMoreRows = true is correctly handled
 		// relies on FETCH_ROWS_TIMEOUT_MS="1000", configured below
 		{sql: "sleep(2000)", res: true},

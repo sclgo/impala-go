@@ -20,6 +20,9 @@ type AuthError struct {
 func (e *AuthError) Error() string {
 	// message does not start with "impala: " because this error is expected to be wrapped
 	// in a chain, reflecting the process during which the auth. error occurred.
+	if e.username == "" {
+		return "authentication failed"
+	}
 	return fmt.Sprintf("authentication failed for user %s", e.username)
 }
 
@@ -36,6 +39,7 @@ type TSaslTransport struct {
 
 	trans thrift.TTransport
 	sasl  Client
+	opts  *Options
 }
 
 // Status is SASL negotiation status
@@ -56,6 +60,7 @@ func NewTSaslTransport(t thrift.TTransport, opts *Options) (*TSaslTransport, err
 	return &TSaslTransport{
 		trans: t,
 		sasl:  sasl,
+		opts:  opts,
 
 		rbuf: bytes.NewBuffer(nil),
 		wbuf: bytes.NewBuffer(nil),
@@ -74,43 +79,48 @@ func (t *TSaslTransport) Open() error {
 		}
 	}
 
-	mech, initial, _, err := t.sasl.Start([]string{MechPlain})
+	mech, initial, done, err := t.sasl.Start([]string{MechPlain})
 	if err != nil {
 		return err
 	}
 
 	if err := t.negotiationSend(StatusStart, []byte(mech)); err != nil {
-return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
+		return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 	}
 	if err := t.negotiationSend(StatusOK, initial); err != nil {
-return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
+		return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 	}
 
 	for {
 		status, challenge, err := t.receive()
 		if err != nil {
-return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
+			return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 		}
 
-		if status != StatusOK && status != StatusComplete {
+		switch status {
+		case StatusOK:
+		case StatusComplete:
+			if !done {
+				return fmt.Errorf("sasl: negotiation failed for mech %s. the server completed it before the client", mech)
+			}
+			return nil
+		case StatusBad:
+			return fmt.Errorf("sasl: the server refused mech %s: %s. %w", mech, challenge, &AuthError{username: t.opts.Username})
+		case StatusError:
+			return fmt.Errorf("sasl: negotiation failed for mech %s. the server's error: %s", mech, challenge)
+		default:
 			return fmt.Errorf("sasl: negotiation failed. bad status: %d", status)
 		}
 
-		if status == StatusComplete {
-			break
-		}
-
-		payload, _, err := t.sasl.Step(challenge)
+		var payload []byte
+		payload, done, err = t.sasl.Step(challenge)
 		if err != nil {
-return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
+			return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 		}
 		if err := t.negotiationSend(StatusOK, payload); err != nil {
-return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
+			return fmt.Errorf("sasl: negotiation failed for mech %s. %w", mech, err)
 		}
-
 	}
-	return nil
-
 }
 
 func (t *TSaslTransport) Read(buf []byte) (int, error) {
@@ -126,7 +136,7 @@ func (t *TSaslTransport) Read(buf []byte) (int, error) {
 
 func (t *TSaslTransport) readFrame(buf []byte) (int, error) {
 	header := make([]byte, 4)
-	_, err := t.trans.Read(header)
+	_, err := io.ReadFull(t.trans, header)
 	if err != nil {
 		return 0, err
 	}
@@ -200,7 +210,7 @@ func (t *TSaslTransport) negotiationSend(status Status, body []byte) error {
 
 func (t *TSaslTransport) receive() (Status, []byte, error) {
 	header := make([]byte, 5)
-	_, err := t.trans.Read(header)
+	_, err := io.ReadFull(t.trans, header)
 	if err != nil {
 		var transportError thrift.TTransportException
 		if errors.As(err, &transportError) {
@@ -210,5 +220,13 @@ func (t *TSaslTransport) receive() (Status, []byte, error) {
 		}
 		return 0, nil, err
 	}
-	return Status(header[0]), header[1:], nil
+	l := binary.BigEndian.Uint32(header[1:])
+	if l > thrift.DEFAULT_MAX_FRAME_SIZE {
+		return 0, nil, fmt.Errorf("sasl: a negotiation message of %d bytes is larger than %d", l, thrift.DEFAULT_MAX_FRAME_SIZE)
+	}
+	body := make([]byte, l)
+	if _, err := io.ReadFull(t.trans, body); err != nil {
+		return 0, nil, err
+	}
+	return Status(header[0]), body, nil
 }

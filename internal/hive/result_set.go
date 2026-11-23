@@ -97,6 +97,11 @@ func value(col *cli_service.TColumn, cd *ColDesc, i int) (any, error) {
 			return nil, nil
 		}
 		return col.DoubleVal.Values[i], nil
+	case "BINARY":
+		if isSet(col.BinaryVal.Nulls, i) {
+			return nil, nil
+		}
+		return col.BinaryVal.Values[i], nil
 	case "TIMESTAMP", "DATETIME":
 		if isSet(col.StringVal.Nulls, i) {
 			return nil, nil
@@ -131,9 +136,6 @@ func length(rs *cli_service.TRowSet) int {
 		if col.I32Val != nil {
 			return len(col.I32Val.Values)
 		}
-		if col.I32Val != nil {
-			return len(col.I32Val.Values)
-		}
 		if col.I64Val != nil {
 			return len(col.I64Val.Values)
 		}
@@ -142,6 +144,9 @@ func length(rs *cli_service.TRowSet) int {
 		}
 		if col.DoubleVal != nil {
 			return len(col.DoubleVal.Values)
+		}
+		if col.BinaryVal != nil {
+			return len(col.BinaryVal.Values)
 		}
 	}
 	return 0

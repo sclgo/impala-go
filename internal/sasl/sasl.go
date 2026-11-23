@@ -24,6 +24,22 @@ type Options struct {
 	Host     string
 	Username string
 	Password string
+
+	// Mechanism, when set, is negotiated in place of PLAIN.
+	Mechanism Mechanism
+}
+
+// Mechanism is a SASL mechanism the driver's caller implements, as GSSAPI's Kerberos exchange (RFC 4752),
+// which the driver does not implement itself. It is one negotiation: the driver asks for a new one for each
+// connection.
+type Mechanism interface {
+	// Name is the mechanism's name, as the server lists it: GSSAPI.
+	Name() string
+	// Start is the client's first message.
+	Start() (initial []byte, err error)
+	// Step answers the server's challenge. done reports the client's side finished: the server must not
+	// complete the negotiation before it is.
+	Step(challenge []byte) (response []byte, done bool, err error)
 }
 
 // Client is SASL client

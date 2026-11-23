@@ -1,11 +1,19 @@
 package impala
 
 import (
+	"context"
 	"crypto/tls"
 	"database/sql"
 	"io"
+	"net"
 	"time"
+
+	"github.com/sclgo/impala-go/internal/hive"
 )
+
+// ServerError is a request the server refused: errors.As finds it in an error the driver returns, with the
+// server's message, SQLSTATE, and code.
+type ServerError = hive.StatusError
 
 func init() {
 	sql.Register("impala", &Driver{})
@@ -35,6 +43,12 @@ type Options struct {
 	ReuseSession bool
 
 	UseLDAP bool
+
+	// SASL, when set, signs a connection in by the SASL mechanism it returns, in place of LDAP's PLAIN: GSSAPI,
+	// Kerberos's (RFC 4752), which the driver does not implement itself. It is called once a connection, whose
+	// negotiation the mechanism it returns holds. UseLDAP is ignored where it is set.
+	// It can't be set in a DSN.
+	SASL func() (SASLMechanism, error)
 
 	UseTLS     bool
 	CACertPath string
@@ -73,6 +87,11 @@ type Options struct {
 
 	// ConnectTimeout configures the max wait for initial connection to server. 0 or negative value means no limit.
 	ConnectTimeout time.Duration
+
+	// DialContext, when set, opens the TCP connection to Host and Port in place of a net.Dialer, as through an
+	// SSH tunnel or a proxy. TLS, when enabled, runs over the connection it returns.
+	// It can't be set in a DSN.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 func (o *Options) systemCAStoreSelected() bool {

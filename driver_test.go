@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -316,4 +317,29 @@ func receiveState(t *testing.T, states <-chan tls.ConnectionState) tls.Connectio
 		t.Fatal("server did not complete a TLS handshake")
 		return tls.ConnectionState{}
 	}
+}
+
+func TestOpenTransport_DialContext(t *testing.T) {
+	errDial := errors.New("dialed")
+	var dialed string
+	opts := &Options{Host: "db.example", Port: "21050", DialContext: func(_ context.Context, network, address string) (net.Conn, error) {
+		dialed = network + " " + address
+		return nil, errDial
+	}}
+	_, _, err := openTransport(context.Background(), opts)
+	require.ErrorIs(t, err, errDial)
+	require.ErrorIs(t, err, ErrOpenFailed)
+	require.Equal(t, "tcp db.example:21050", dialed)
+}
+
+func TestParseDSN(t *testing.T) {
+	opts, err := ParseDSN("impala://fry:pw@db.example:21051?auth=ldap&tls=true")
+	require.NoError(t, err)
+	require.Equal(t, "db.example", opts.Host)
+	require.Equal(t, "21051", opts.Port)
+	require.Equal(t, "fry", opts.Username)
+	require.True(t, opts.UseLDAP)
+	require.True(t, opts.UseTLS)
+	_, err = ParseDSN("notimpala://")
+	require.ErrorContains(t, err, "notimpala")
 }

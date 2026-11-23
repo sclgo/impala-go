@@ -30,6 +30,21 @@ func (e *StatusError) Status() cli_service.TStatus {
 	return e.status
 }
 
+// Message is the server's message, as it sent it.
+func (e *StatusError) Message() string {
+	return e.status.GetErrorMessage()
+}
+
+// SQLState is the server's SQLSTATE for the error, often HY000.
+func (e *StatusError) SQLState() string {
+	return e.status.GetSqlState()
+}
+
+// ErrorCode is the server's code for the error, often 0.
+func (e *StatusError) ErrorCode() int32 {
+	return e.status.GetErrorCode()
+}
+
 func checkStatus(resp rpcResponse) (err error) {
 	status := resp.GetStatus()
 	code := status.StatusCode
@@ -59,7 +74,15 @@ func checkState(resp *cli_service.TGetOperationStatusResp) (err error) {
 		// in rare cases status may be SUCCESS even if state is ERROR
 		// for example, if the error is discovered by Hive Metastore but not by Impala
 
-		err = fmt.Errorf("%v: %s", state, resp.GetErrorMessage())
+		err = &StatusError{
+			status: cli_service.TStatus{
+				StatusCode:   cli_service.TStatusCode_ERROR_STATUS,
+				SqlState:     resp.SqlState,
+				ErrorCode:    resp.ErrorCode,
+				ErrorMessage: resp.ErrorMessage,
+			},
+			errMessage: fmt.Sprintf("%v: %s", state, resp.GetErrorMessage()),
+		}
 	}
 	return wrapServerError(err)
 }

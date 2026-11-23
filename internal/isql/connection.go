@@ -95,8 +95,10 @@ func (c *Conn) QueryContext(ctx context.Context, q string, args []driver.NamedVa
 		return nil, err
 	}
 
-	tmpl := template(q)
-	stmt := statement(tmpl, args)
+	stmt, err := bind(q, args)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := query(ctx, session, stmt)
 	return rows, mapErr(err)
 }
@@ -109,8 +111,10 @@ func (c *Conn) ExecContext(ctx context.Context, q string, args []driver.NamedVal
 		return nil, err
 	}
 
-	tmpl := template(q)
-	stmt := statement(tmpl, args)
+	stmt, err := bind(q, args)
+	if err != nil {
+		return nil, err
+	}
 	res, err := exec(ctx, session, stmt)
 	return res, mapErr(err)
 }
